@@ -8,7 +8,6 @@ const {
   deleteSession
 } = require('../controllers/sessionController')
 
-// Clean, readable route definitions
 router.get('/', getAllSessions)
 router.get('/:id', getSessionById)
 router.post('/', createSession)

@@ -1,68 +1,26 @@
 const ApiResponse = require('../utils/apiResponse')
 const asyncHandler = require('../middleware/asyncHandler')
-
-// Temporary data — we replace this with database in Week 5
-let interviewSessions = [
-  {
-    id: 1,
-    candidateName: 'John Doe',
-    role: 'Software Engineer',
-    level: 'L3',
-    status: 'scheduled',
-    scheduledAt: '2024-12-01T10:00:00Z',
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 2,
-    candidateName: 'Jane Smith',
-    role: 'Senior Engineer',
-    level: 'L5',
-    status: 'completed',
-    scheduledAt: '2024-11-28T14:00:00Z',
-    createdAt: new Date().toISOString()
-  }
-]
-
-// Validation helper
-const validateSession = (data) => {
-  const errors = []
-
-  if (!data.candidateName || data.candidateName.trim() === '') {
-    errors.push('candidateName is required')
-  }
-
-  if (!data.role || data.role.trim() === '') {
-    errors.push('role is required')
-  }
-
-  const validLevels = ['L3', 'L4', 'L5', 'L6', 'L7']
-  if (!data.level || !validLevels.includes(data.level)) {
-    errors.push(`level must be one of: ${validLevels.join(', ')}`)
-  }
-
-  return errors
-}
+const { prisma } = require('../config/database')
 
 // GET /api/v1/sessions
 const getAllSessions = asyncHandler(async (req, res) => {
-  // Future: add pagination, filtering, sorting here
   const { status, role } = req.query
 
-  let filtered = [...interviewSessions]
-
-  if (status) {
-    filtered = filtered.filter(s => s.status === status)
-  }
-
-  if (role) {
-    filtered = filtered.filter(s =>
-      s.role.toLowerCase().includes(role.toLowerCase())
-    )
-  }
+  const sessions = await prisma.interviewSession.findMany({
+    where: {
+      ...(status && { status: status.toUpperCase() }),
+      ...(role && { role: { contains: role, mode: 'insensitive' } })
+    },
+    include: {
+      interviewer: { select: { id: true, name: true, email: true } },
+      candidate: { select: { id: true, name: true, email: true } }
+    },
+    orderBy: { scheduledAt: 'asc' }
+  })
 
   ApiResponse.success(res, {
-    sessions: filtered,
-    count: filtered.length
+    sessions,
+    count: sessions.length
   }, 'Sessions retrieved successfully')
 })
 
@@ -74,7 +32,13 @@ const getSessionById = asyncHandler(async (req, res) => {
     return ApiResponse.badRequest(res, 'Session ID must be a number')
   }
 
-  const session = interviewSessions.find(s => s.id === id)
+  const session = await prisma.interviewSession.findUnique({
+    where: { id },
+    include: {
+      interviewer: { select: { id: true, name: true, email: true } },
+      candidate: { select: { id: true, name: true, email: true } }
+    }
+  })
 
   if (!session) {
     return ApiResponse.notFound(res, `Session with id ${id} not found`)
@@ -85,81 +49,81 @@ const getSessionById = asyncHandler(async (req, res) => {
 
 // POST /api/v1/sessions
 const createSession = asyncHandler(async (req, res) => {
-  const { candidateName, role, level, scheduledAt } = req.body
+  const { title, role, level, scheduledAt, interviewerId, candidateId } = req.body
 
-  // Validate input
-  const errors = validateSession({ candidateName, role, level })
+  // Validation
+  const errors = []
+  if (!title) errors.push('title is required')
+  if (!role) errors.push('role is required')
+  if (!level) errors.push('level is required')
+  if (!scheduledAt) errors.push('scheduledAt is required')
+  if (!interviewerId) errors.push('interviewerId is required')
+  if (!candidateId) errors.push('candidateId is required')
+
   if (errors.length > 0) {
     return ApiResponse.badRequest(res, 'Validation failed', errors)
   }
 
-  const newSession = {
-    id: interviewSessions.length + 1,
-    candidateName: candidateName.trim(),
-    role: role.trim(),
-    level,
-    status: 'scheduled',
-    scheduledAt: scheduledAt || new Date().toISOString(),
-    createdAt: new Date().toISOString()
-  }
+  // Check users exist
+  const [interviewer, candidate] = await Promise.all([
+    prisma.user.findUnique({ where: { id: interviewerId } }),
+    prisma.user.findUnique({ where: { id: candidateId } })
+  ])
 
-  interviewSessions.push(newSession)
+  if (!interviewer) return ApiResponse.notFound(res, 'Interviewer not found')
+  if (!candidate) return ApiResponse.notFound(res, 'Candidate not found')
 
-  ApiResponse.created(res, newSession, 'Session created successfully')
+  const session = await prisma.interviewSession.create({
+    data: {
+      title,
+      role,
+      level,
+      scheduledAt: new Date(scheduledAt),
+      interviewerId,
+      candidateId
+    },
+    include: {
+      interviewer: { select: { id: true, name: true, email: true } },
+      candidate: { select: { id: true, name: true, email: true } }
+    }
+  })
+
+  ApiResponse.created(res, session, 'Session created successfully')
 })
 
 // PUT /api/v1/sessions/:id
 const updateSession = asyncHandler(async (req, res) => {
   const id = parseInt(req.params.id)
-
-  if (isNaN(id)) {
-    return ApiResponse.badRequest(res, 'Session ID must be a number')
-  }
-
-  const validStatuses = ['scheduled', 'in-progress', 'completed', 'cancelled']
   const { status } = req.body
 
-  if (!status || !validStatuses.includes(status)) {
+  const validStatuses = ['SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']
+
+  if (!status || !validStatuses.includes(status.toUpperCase())) {
     return ApiResponse.badRequest(
       res,
       `Status must be one of: ${validStatuses.join(', ')}`
     )
   }
 
-  const sessionIndex = interviewSessions.findIndex(s => s.id === id)
+  const session = await prisma.interviewSession.update({
+    where: { id },
+    data: { status: status.toUpperCase() },
+    include: {
+      interviewer: { select: { id: true, name: true, email: true } },
+      candidate: { select: { id: true, name: true, email: true } }
+    }
+  })
 
-  if (sessionIndex === -1) {
-    return ApiResponse.notFound(res, `Session with id ${id} not found`)
-  }
-
-  interviewSessions[sessionIndex] = {
-    ...interviewSessions[sessionIndex],
-    status,
-    updatedAt: new Date().toISOString()
-  }
-
-  ApiResponse.success(
-    res,
-    interviewSessions[sessionIndex],
-    'Session updated successfully'
-  )
+  ApiResponse.success(res, session, 'Session updated successfully')
 })
 
 // DELETE /api/v1/sessions/:id
 const deleteSession = asyncHandler(async (req, res) => {
   const id = parseInt(req.params.id)
 
-  if (isNaN(id)) {
-    return ApiResponse.badRequest(res, 'Session ID must be a number')
-  }
-
-  const sessionIndex = interviewSessions.findIndex(s => s.id === id)
-
-  if (sessionIndex === -1) {
-    return ApiResponse.notFound(res, `Session with id ${id} not found`)
-  }
-
-  interviewSessions.splice(sessionIndex, 1)
+  await prisma.interviewSession.delete({
+    where: { id }
+  })
 
   ApiResponse.success(res, null, 'Session deleted successfully')
 })

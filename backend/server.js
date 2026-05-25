@@ -6,10 +6,11 @@ const routes = require('./routes/index')
 
 const app = express()
 
-// ── Core Middleware ──────────────────────────────
+// ── Core Middleware ─────
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 app.use(logger)
+
 
 // ── Health Check ─────────────────────────────────
 app.get('/health', (req, res) => {
@@ -21,16 +22,21 @@ app.get('/health', (req, res) => {
   })
 })
 
+
 // ── API Routes ───────────────────────────────────
 app.use(config.API_VERSION, routes)
 
 // ── Error Handling (MUST be last) ────────────────
-app.use('*', notFoundHandler)
+app.use(notFoundHandler)
 app.use(errorHandler)
 
-// ── Start Server ─────────────────────────────────
-app.listen(config.PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${config.PORT}`)
-  console.log(`🌍 Environment: ${config.NODE_ENV}`)
-  console.log(`📋 API Base URL: http://localhost:${config.PORT}${config.API_VERSION}`)
+const { connectDB } = require('./config/database')
+
+// Connect to database before starting server
+connectDB().then(() => {
+  app.listen(config.PORT, () => {
+    console.log(`🚀 Server running on http://localhost:${config.PORT}`)
+    console.log(`🌍 Environment: ${config.NODE_ENV}`)
+    console.log(`📋 API Base: http://localhost:${config.PORT}${config.API_VERSION}`)
+  })
 })
