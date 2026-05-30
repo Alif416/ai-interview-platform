@@ -8,14 +8,39 @@ const {
   deleteSession
 } = require('../controllers/sessionController')
 const { authenticate, authorize } = require('../middleware/auth')
+const validate = require('../middleware/validate')
+const {
+  createSessionSchema,
+  updateSessionSchema,
+  sessionQuerySchema
+} = require('../utils/validators')
 
-// Public — anyone can view sessions
-router.get('/', getAllSessions)
+// Public
+router.get('/', validate(sessionQuerySchema, 'query'), getAllSessions)
 router.get('/:id', getSessionById)
 
-// Protected — must be logged in
-router.post('/', authenticate, authorize('INTERVIEWER', 'ADMIN'), createSession)
-router.put('/:id', authenticate, authorize('INTERVIEWER', 'ADMIN'), updateSession)
-router.delete('/:id', authenticate, authorize('ADMIN'), deleteSession)
+// Protected
+router.post(
+  '/',
+  authenticate,
+  authorize('INTERVIEWER', 'ADMIN'),
+  validate(createSessionSchema),
+  createSession
+)
+
+router.put(
+  '/:id',
+  authenticate,
+  authorize('INTERVIEWER', 'ADMIN'),
+  validate(updateSessionSchema),
+  updateSession
+)
+
+router.delete(
+  '/:id',
+  authenticate,
+  authorize('ADMIN'),
+  deleteSession
+)
 
 module.exports = router
