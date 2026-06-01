@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import Login from './pages/Login'
 import Register from './pages/Registar'
 import Dashboard from './pages/Dashboard'
+import LiveInterviewRoom from './pages/LiveInterviewRoom'
 
 function App() {
   return (
@@ -20,6 +21,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/room/:sessionId"
+            element={
+              <ProtectedRoute>
+                <LiveInterviewRoom />
               </ProtectedRoute>
             }
           />
