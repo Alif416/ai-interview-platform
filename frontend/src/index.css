@@ -1,3 +1,58 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --lc-bg: #1a1a2e;
+  --lc-bg2: #16213e;
+  --lc-surface: #282828;
+  --lc-surface2: #333333;
+  --lc-border: #3e3e3e;
+  --lc-border-light: #4a4a4a;
+  --lc-orange: #ffa116;
+  --lc-orange-dark: #e08e0b;
+  --lc-text: #eff2f6;
+  --lc-text-dim: #b3b3b3;
+  --lc-muted: #6b7280;
+  --lc-success: #00b8a3;
+  --lc-success-dim: #004d47;
+  --lc-yellow: #ffc01e;
+  --lc-yellow-dim: #4d3a00;
+  --lc-error: #ef4743;
+  --lc-error-dim: #4d1515;
+  --lc-blue: #60a5fa;
+  --lc-blue-dim: #1e3a5f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--lc-bg);
+  color: var(--lc-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--lc-surface);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--lc-border-light);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--lc-muted);
+}
+
+/* Selection */
+::selection {
+  background: var(--lc-orange);
+  color: #000;
+}
