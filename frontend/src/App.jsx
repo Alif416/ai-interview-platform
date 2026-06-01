@@ -1,50 +1,35 @@
-import { useState } from 'react'
-import SessionList from './components/SessionList'
-import Counter from './components/Counter'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { AuthProvider } from './context/AuthContext'
+import ProtectedRoute from './components/ProtectedRoute'
+import Login from './pages/Login'
+import Register from './pages/Register'
+import Dashboard from './pages/Dashboard'
 
 function App() {
-  const [activeTab, setActiveTab] = useState('sessions')
-
   return (
-    <div className="min-h-screen bg-gray-50">
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
+          {/* Public routes */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
 
-      {/* Navbar */}
-      <nav className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-blue-600">
-            🤖 AI Interview Platform
-          </h1>
-          <div className="flex gap-4">
-            <button
-              onClick={() => setActiveTab('sessions')}
-              className={`px-4 py-2 rounded ${
-                activeTab === 'sessions'
-                  ? 'bg-blue-500 text-white'
-                  : 'text-gray-600 hover:text-blue-500'
-              }`}
-            >
-              Sessions
-            </button>
-            <button
-              onClick={() => setActiveTab('counter')}
-              className={`px-4 py-2 rounded ${
-                activeTab === 'counter'
-                  ? 'bg-blue-500 text-white'
-                  : 'text-gray-600 hover:text-blue-500'
-              }`}
-            >
-              State Demo
-            </button>
-          </div>
-        </div>
-      </nav>
+          {/* Protected routes */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        {activeTab === 'sessions' && <SessionList />}
-        {activeTab === 'counter' && <Counter />}
-      </main>
-    </div>
+          {/* Default redirect */}
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
   )
 }
 
