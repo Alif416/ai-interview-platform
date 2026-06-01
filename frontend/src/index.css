@@ -1,58 +1,152 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
+/* ─── LeetCode Design Tokens ─────────────────────────────────────── */
 :root {
-  --lc-bg: #1a1a2e;
-  --lc-bg2: #16213e;
-  --lc-surface: #282828;
-  --lc-surface2: #333333;
-  --lc-border: #3e3e3e;
-  --lc-border-light: #4a4a4a;
-  --lc-orange: #ffa116;
-  --lc-orange-dark: #e08e0b;
-  --lc-text: #eff2f6;
-  --lc-text-dim: #b3b3b3;
-  --lc-muted: #6b7280;
-  --lc-success: #00b8a3;
-  --lc-success-dim: #004d47;
-  --lc-yellow: #ffc01e;
-  --lc-yellow-dim: #4d3a00;
-  --lc-error: #ef4743;
-  --lc-error-dim: #4d1515;
-  --lc-blue: #60a5fa;
-  --lc-blue-dim: #1e3a5f;
+  /* Backgrounds */
+  --lc-bg:          #1a1a1a;
+  --lc-bg-overlay:  #222222;
+  --lc-nav:         #282828;
+  --lc-surface:     #282828;
+  --lc-surface-2:   #1f1f1f;
+  --lc-surface-3:   #333333;
+
+  /* Borders */
+  --lc-border:      #3c3c3c;
+  --lc-border-2:    #4a4a4a;
+
+  /* Brand */
+  --lc-orange:      #ffa116;
+  --lc-orange-hover:#e08e0b;
+  --lc-orange-dim:  rgba(255,161,22,0.15);
+
+  /* Text */
+  --lc-text:        #eff2f6;
+  --lc-text-2:      rgba(239,242,246,0.75);
+  --lc-text-3:      rgba(239,242,246,0.45);
+  --lc-muted:       #808080;
+
+  /* Difficulty / Status */
+  --lc-easy:        #00b8a3;
+  --lc-easy-dim:    rgba(0,184,163,0.15);
+  --lc-medium:      #ffc01e;
+  --lc-medium-dim:  rgba(255,192,30,0.15);
+  --lc-hard:        #ff375f;
+  --lc-hard-dim:    rgba(255,55,95,0.15);
+
+  /* Utility */
+  --lc-blue:        #60a5fa;
+  --lc-blue-dim:    rgba(96,165,250,0.15);
+  --lc-green:       #00b8a3;
+  --lc-error:       #ff375f;
+  --lc-error-dim:   rgba(255,55,95,0.12);
 }
 
-* {
-  box-sizing: border-box;
-}
+/* ─── Base ────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { font-size: 14px; }
 
 body {
+  margin: 0;
   background-color: var(--lc-bg);
   color: var(--lc-text);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: var(--lc-surface);
-}
+/* ─── Scrollbar ───────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: var(--lc-border-light);
-  border-radius: 3px;
+  background: var(--lc-border-2);
+  border-radius: 2px;
 }
-::-webkit-scrollbar-thumb:hover {
-  background: var(--lc-muted);
-}
+::-webkit-scrollbar-thumb:hover { background: var(--lc-muted); }
 
-/* Selection */
-::selection {
+/* ─── Selection ───────────────────────────────────────────────────── */
+::selection { background: var(--lc-orange); color: #000; }
+
+/* ─── Reusable utility classes ────────────────────────────────────── */
+.lc-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 18px;
   background: var(--lc-orange);
   color: #000;
+  font-weight: 600;
+  font-size: 13px;
+  border-radius: 9999px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
 }
+.lc-btn-primary:hover { background: var(--lc-orange-hover); }
+.lc-btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.lc-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px;
+  background: transparent;
+  color: var(--lc-text-2);
+  font-weight: 500;
+  font-size: 13px;
+  border-radius: 9999px;
+  border: 1px solid var(--lc-border-2);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.lc-btn-secondary:hover {
+  border-color: var(--lc-text-3);
+  color: var(--lc-text);
+}
+
+.lc-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  background: transparent;
+  color: var(--lc-text-3);
+  font-size: 13px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.lc-btn-ghost:hover {
+  background: var(--lc-surface-3);
+  color: var(--lc-text);
+}
+
+.lc-input {
+  width: 100%;
+  background: var(--lc-surface-2);
+  border: 1px solid var(--lc-border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--lc-text);
+  outline: none;
+  transition: border-color 0.15s;
+  font-family: inherit;
+}
+.lc-input::placeholder { color: var(--lc-muted); }
+.lc-input:focus { border-color: var(--lc-orange); }
+
+.lc-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.lc-badge-easy   { background: var(--lc-easy-dim);   color: var(--lc-easy);   }
+.lc-badge-medium { background: var(--lc-medium-dim); color: var(--lc-medium); }
+.lc-badge-hard   { background: var(--lc-hard-dim);   color: var(--lc-hard);   }
+.lc-badge-blue   { background: var(--lc-blue-dim);   color: var(--lc-blue);   }
