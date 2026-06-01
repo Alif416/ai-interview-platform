@@ -170,11 +170,15 @@ export default function LiveInterviewRoom() {
   const [joinNotice, setJoinNotice] = useState(null)
   const [activeUsers, setActiveUsers] = useState([])
   const [typingUsers, setTypingUsers] = useState([])
+  const [chatTypingUsers, setChatTypingUsers] = useState([])
+  const [unreadCount, setUnreadCount] = useState(0)
 
   const socketRef = useRef(null)
   const messagesEndRef = useRef(null)
   const chatInputRef = useRef(null)
   const typingTimeoutRef = useRef(null)
+  const chatTypingTimeoutRef = useRef(null)
+  const chatFocusedRef = useRef(false)
 
   // Yjs + Monaco refs
   const ydocRef = useRef(null)
@@ -210,16 +214,36 @@ export default function LiveInterviewRoom() {
       setJoinNotice(`${name} joined the room`)
       setTimeout(() => setJoinNotice(null), 3000)
     })
-    s.on('user-left', ({ name, participants }) => {
+    s.on('user-left', ({ userId, name, participants }) => {
       setParticipants(participants)
+      setChatTypingUsers(prev => prev.filter(u => u.userId !== userId))
       setJoinNotice(`${name} left the room`)
       setTimeout(() => setJoinNotice(null), 3000)
     })
 
     s.on('language-change', ({ language: lang }) => setLanguage(lang))
-    s.on('chat-message', (msg) => setMessages(prev => [...prev, msg]))
+    s.on('chat-message', (msg) => {
+      setMessages(prev => [...prev, msg])
+      // Clear typing indicator for the sender as their message arrived
+      setChatTypingUsers(prev => prev.filter(u => u.userId !== msg.userId))
+      // Increment unread if the chat input isn't currently focused
+      if (!chatFocusedRef.current) {
+        setUnreadCount(prev => prev + 1)
+      }
+    })
+
+    s.on('chat-typing', ({ userId, name, role, isTyping }) => {
+      setChatTypingUsers(prev => {
+        if (isTyping) {
+          if (prev.find(u => u.userId === userId)) return prev
+          return [...prev, { userId, name, role }]
+        }
+        return prev.filter(u => u.userId !== userId)
+      })
+    })
 
     return () => {
+      clearTimeout(chatTypingTimeoutRef.current)
       s.disconnect()
       socketRef.current = null
     }
@@ -344,13 +368,26 @@ export default function LiveInterviewRoom() {
     }
   }, [sessionId])
 
+  const emitChatTyping = useCallback((isTyping) => {
+    socketRef.current?.emit('chat-typing', { sessionId, isTyping })
+  }, [sessionId])
+
+  const handleChatInput = useCallback((e) => {
+    setChatInput(e.target.value)
+    emitChatTyping(true)
+    clearTimeout(chatTypingTimeoutRef.current)
+    chatTypingTimeoutRef.current = setTimeout(() => emitChatTyping(false), 1500)
+  }, [emitChatTyping])
+
   const sendMessage = useCallback(() => {
     const msg = chatInput.trim()
     if (!msg || !socketRef.current) return
+    clearTimeout(chatTypingTimeoutRef.current)
+    emitChatTyping(false)
     socketRef.current.emit('chat-message', { sessionId, message: msg })
     setChatInput('')
     chatInputRef.current?.focus()
-  }, [chatInput, sessionId])
+  }, [chatInput, sessionId, emitChatTyping])
 
   const handleChatKey = useCallback((e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -560,9 +597,19 @@ export default function LiveInterviewRoom() {
               style={{ backgroundColor: 'var(--lc-surface-2)', borderColor: 'var(--lc-border)' }}
             >
               <div className="flex items-center gap-2">
-                <svg className="w-4 h-4" style={{ color: 'var(--lc-text-3)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
+                <div className="relative">
+                  <svg className="w-4 h-4" style={{ color: 'var(--lc-text-3)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                  {unreadCount > 0 && (
+                    <span
+                      className="absolute -top-1.5 -right-1.5 min-w-3.5 h-3.5 px-0.5 rounded-full flex items-center justify-center text-xs font-bold leading-none"
+                      style={{ backgroundColor: 'var(--lc-orange)', color: '#1a1a1a', fontSize: '9px' }}
+                    >
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
+                </div>
                 <span className="text-xs font-medium" style={{ color: 'var(--lc-text-3)' }}>Chat</span>
               </div>
               <span
@@ -594,6 +641,20 @@ export default function LiveInterviewRoom() {
               <div ref={messagesEndRef} />
             </div>
 
+            {/* Chat typing indicator */}
+            {chatTypingUsers.length > 0 && (
+              <div
+                className="shrink-0 px-4 py-1.5 flex items-center gap-2 border-t"
+                style={{ backgroundColor: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}
+              >
+                <TypingDots />
+                <span className="text-xs" style={{ color: 'var(--lc-muted)' }}>
+                  {chatTypingUsers.map(u => u.name).join(', ')}
+                  {' '}{chatTypingUsers.length === 1 ? 'is' : 'are'} typing…
+                </span>
+              </div>
+            )}
+
             {/* Chat input */}
             <div
               className="shrink-0 px-3 py-3 border-t"
@@ -603,8 +664,10 @@ export default function LiveInterviewRoom() {
                 <input
                   ref={chatInputRef}
                   value={chatInput}
-                  onChange={e => setChatInput(e.target.value)}
+                  onChange={handleChatInput}
                   onKeyDown={handleChatKey}
+                  onFocus={() => { chatFocusedRef.current = true; setUnreadCount(0) }}
+                  onBlur={() => { chatFocusedRef.current = false }}
                   placeholder={connected ? 'Type a message… (Enter to send)' : 'Connecting…'}
                   className="lc-input flex-1 text-sm"
                   style={{ padding: '7px 12px' }}

@@ -1,5 +1,60 @@
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
+import Editor from '@monaco-editor/react'
 import api from '../api/axios'
+
+/* ── Monaco config ────────────────────────────────────────────────── */
+const LANGUAGES = ['javascript', 'typescript', 'python', 'java', 'cpp', 'go', 'rust', 'sql', 'plaintext']
+
+const LC_DARK_THEME = {
+  base: 'vs-dark',
+  inherit: true,
+  rules: [
+    { token: 'comment',  foreground: '6b7280', fontStyle: 'italic' },
+    { token: 'keyword',  foreground: 'c084fc' },
+    { token: 'string',   foreground: '86efac' },
+    { token: 'number',   foreground: 'fca5a5' },
+    { token: 'type',     foreground: '67e8f9' },
+  ],
+  colors: {
+    'editor.background':                  '#1a1a1a',
+    'editor.foreground':                  '#eff2f6',
+    'editor.lineHighlightBackground':     '#282828',
+    'editor.selectionBackground':         '#ffa11640',
+    'editor.inactiveSelectionBackground': '#ffa11620',
+    'editorLineNumber.foreground':        '#4a4a4a',
+    'editorLineNumber.activeForeground':  '#ffa116',
+    'editorCursor.foreground':            '#ffa116',
+    'editorIndentGuide.background1':      '#3c3c3c',
+    'editorWhitespace.foreground':        '#3c3c3c',
+    'editorBracketMatch.background':      '#ffa11630',
+    'editorBracketMatch.border':          '#ffa11680',
+    'scrollbarSlider.background':         '#3c3c3c80',
+    'scrollbarSlider.hoverBackground':    '#4a4a4a80',
+    'minimap.background':                 '#1a1a1a',
+  },
+}
+
+const EDITOR_OPTIONS = {
+  fontSize: 14,
+  fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace",
+  fontLigatures: true,
+  minimap: { enabled: false },
+  scrollBeyondLastLine: false,
+  lineNumbers: 'on',
+  roundedSelection: true,
+  padding: { top: 16, bottom: 16 },
+  folding: true,
+  wordWrap: 'on',
+  tabSize: 2,
+  insertSpaces: true,
+  automaticLayout: true,
+  quickSuggestions: true,
+  bracketPairColorization: { enabled: true },
+  renderLineHighlight: 'line',
+  smoothScrolling: true,
+  cursorBlinking: 'smooth',
+  cursorSmoothCaretAnimation: 'on',
+}
 
 /* ── helpers ──────────────────────────────────────────────────────── */
 const LEVELS = ['L3', 'L4', 'L5', 'L6', 'L7']
@@ -47,6 +102,17 @@ export default function AIInterview() {
   const [evaluating, setEvaluating]   = useState(false)
   const [leftTab, setLeftTab]         = useState('description')   // description | solutions
   const [rightTab, setRightTab]       = useState('answer')        // answer | results
+  const [editorLanguage, setEditorLanguage] = useState('javascript')
+
+  const editorRef  = useRef(null)
+  const monacoRef  = useRef(null)
+
+  const handleEditorMount = useCallback((editor, monaco) => {
+    monaco.editor.defineTheme('lc-dark', LC_DARK_THEME)
+    monaco.editor.setTheme('lc-dark')
+    editorRef.current  = editor
+    monacoRef.current  = monaco
+  }, [])
 
   const generateQuestions = async () => {
     setGenerating(true)
@@ -66,6 +132,7 @@ export default function AIInterview() {
     setEvaluation(null)
     setLeftTab('description')
     setRightTab('answer')
+    setEditorLanguage('javascript')
   }
 
   const submitAnswer = async () => {
@@ -85,7 +152,7 @@ export default function AIInterview() {
     finally { setEvaluating(false) }
   }
 
-  const wordCount = answer.trim().split(/\s+/).filter(Boolean).length
+  const lineCount = answer ? answer.split('\n').length : 0
 
   /* ── No questions yet → setup screen ──────────────────────────── */
   if (!questions.length) {
@@ -416,28 +483,58 @@ export default function AIInterview() {
               ))}
             </div>
             {rightTab === 'answer' && (
-              <span className="text-xs pr-2" style={{ color: 'var(--lc-text-3)' }}>
-                {wordCount} {wordCount === 1 ? 'word' : 'words'}
-              </span>
+              <div className="flex items-center gap-2 pr-2">
+                <div className="relative">
+                  <select
+                    value={editorLanguage}
+                    onChange={e => {
+                      const lang = e.target.value
+                      setEditorLanguage(lang)
+                      if (editorRef.current && monacoRef.current) {
+                        monacoRef.current.editor.setModelLanguage(editorRef.current.getModel(), lang)
+                      }
+                    }}
+                    className="lc-input text-xs pr-5 appearance-none cursor-pointer"
+                    style={{ padding: '2px 18px 2px 7px', backgroundColor: 'var(--lc-surface-3)', minWidth: '100px' }}
+                  >
+                    {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
+                  </select>
+                  <svg
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none"
+                    style={{ color: 'var(--lc-text-3)' }}
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+                <span className="text-xs" style={{ color: 'var(--lc-text-3)' }}>
+                  {lineCount} {lineCount === 1 ? 'line' : 'lines'}
+                </span>
+              </div>
             )}
           </div>
 
-          {/* Answer textarea */}
+          {/* Monaco Editor */}
           {rightTab === 'answer' && (
-            <textarea
-              value={answer}
-              onChange={e => setAnswer(e.target.value)}
-              placeholder="Write your answer here..."
-              className="flex-1 w-full p-5 text-sm outline-none resize-none"
-              style={{
-                backgroundColor: 'var(--lc-surface-2)',
-                color: 'var(--lc-text)',
-                fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-                lineHeight: 1.75,
-                border: 'none',
-                caretColor: 'var(--lc-orange)',
-              }}
-            />
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <Editor
+                height="100%"
+                language={editorLanguage}
+                value={answer}
+                onChange={val => setAnswer(val ?? '')}
+                theme="lc-dark"
+                options={EDITOR_OPTIONS}
+                onMount={handleEditorMount}
+                loading={
+                  <div
+                    className="flex items-center justify-center h-full"
+                    style={{ backgroundColor: '#1a1a1a', color: '#4a4a4a' }}
+                  >
+                    <span className="text-sm">Loading editor…</span>
+                  </div>
+                }
+              />
+            </div>
           )}
 
           {/* Results panel */}

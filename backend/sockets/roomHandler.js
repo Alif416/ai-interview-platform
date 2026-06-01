@@ -104,6 +104,15 @@ function setupRoomHandlers(io) {
       io.to(sessionId).emit('chat-message', msg)
     })
 
+    socket.on('chat-typing', ({ sessionId, isTyping }) => {
+      socket.to(sessionId).emit('chat-typing', {
+        userId: socket.user.id,
+        name: socket.user.name,
+        role: socket.user.role,
+        isTyping
+      })
+    })
+
     socket.on('disconnect', () => {
       const sessionId = socket.sessionId
       if (!sessionId) return
