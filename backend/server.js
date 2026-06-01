@@ -3,13 +3,18 @@ const config = require('./config/config')
 const logger = require('./middleware/logger')
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler')
 const routes = require('./routes/index')
-
+const cors = require('cors')
 const app = express()
 
-// ── Core Middleware ─────
+// ── Core Middleware ──────────────────────────────
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 app.use(logger)
+
+app.use(cors({
+  origin: 'http://localhost:5173',
+  credentials: true
+}))
 
 
 // ── Health Check ─────────────────────────────────
@@ -22,21 +27,12 @@ app.get('/health', (req, res) => {
   })
 })
 
-
 // ── API Routes ───────────────────────────────────
 app.use(config.API_VERSION, routes)
 
-// ── Error Handling (MUST be last) ────────────────
-app.use(notFoundHandler)
+// ── Error Handling ────────────────────────────────
+app.use('/{*path}', notFoundHandler)
 app.use(errorHandler)
 
-const { connectDB } = require('./config/database')
-
-// Connect to database before starting server
-connectDB().then(() => {
-  app.listen(config.PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${config.PORT}`)
-    console.log(`🌍 Environment: ${config.NODE_ENV}`)
-    console.log(`📋 API Base: http://localhost:${config.PORT}${config.API_VERSION}`)
-  })
-})
+// Export app for testing
+module.exports = app

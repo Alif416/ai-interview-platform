@@ -1,8 +1,12 @@
+require('dotenv').config()
+
+const { Pool } = require('pg')
 const { PrismaClient } = require('@prisma/client')
 const { PrismaPg } = require('@prisma/adapter-pg')
 
-// Prisma 7 requires an adapter for direct DB connections
-const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL })
+// PrismaPg requires a pg.Pool instance, not a plain config object
+const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+const adapter = new PrismaPg(pool)
 
 // Single instance across entire app
 // Creating multiple instances causes connection issues
