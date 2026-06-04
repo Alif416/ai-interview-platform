@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import Editor from '@monaco-editor/react'
 import api from '../api/axios'
 
@@ -100,12 +100,23 @@ export default function AIInterview() {
   const [evaluation, setEvaluation]   = useState(null)
   const [generating, setGenerating]   = useState(false)
   const [evaluating, setEvaluating]   = useState(false)
-  const [leftTab, setLeftTab]         = useState('description')   // description | solutions
-  const [rightTab, setRightTab]       = useState('answer')        // answer | results
+  const [submitError, setSubmitError] = useState(null)
+  const [leftTab, setLeftTab]         = useState('description')
+  const [rightTab, setRightTab]       = useState('answer')
   const [editorLanguage, setEditorLanguage] = useState('javascript')
+
+  // Chat state
+  const [chatMessages, setChatMessages] = useState([])
+  const [chatInput, setChatInput]       = useState('')
+  const [chatStreaming, setChatStreaming] = useState(false)
 
   const editorRef  = useRef(null)
   const monacoRef  = useRef(null)
+  const chatEndRef = useRef(null)
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [chatMessages])
 
   const handleEditorMount = useCallback((editor, monaco) => {
     monaco.editor.defineTheme('lc-dark', LC_DARK_THEME)
@@ -130,26 +141,122 @@ export default function AIInterview() {
     setSelected(q)
     setAnswer('')
     setEvaluation(null)
+    setSubmitError(null)
     setLeftTab('description')
     setRightTab('answer')
     setEditorLanguage('javascript')
+    setChatMessages([])
+    setChatInput('')
   }
 
   const submitAnswer = async () => {
     if (!selected || !answer.trim()) return
     setEvaluating(true)
     setEvaluation(null)
+    setSubmitError(null)
     try {
       const { data } = await api.post('/ai/evaluate', {
         question: selected.question,
         answer,
         role: config.role,
         level: config.level,
+        topic: config.topic,
       })
       setEvaluation(data.data)
       setRightTab('results')
-    } catch (e) { console.error(e) }
+    } catch (e) {
+      console.error(e)
+      setSubmitError(e.response?.data?.message || 'Evaluation failed. Please try again.')
+    }
     finally { setEvaluating(false) }
+  }
+
+  const sendChat = async () => {
+    if (!chatInput.trim() || chatStreaming) return
+
+    const userText = chatInput.trim()
+    setChatInput('')
+    setChatMessages(prev => [...prev, { role: 'user', text: userText }])
+    setChatStreaming(true)
+
+    // Build conversation history sent to the API
+    const contextMessages = selected ? [
+      {
+        role: 'user',
+        content: `I'm practicing for a ${config.role} (${config.level} level) interview. The question I'm working on is: "${selected.question}". Help me understand and think through it.`
+      },
+      {
+        role: 'assistant',
+        content: `Got it — let's work through this ${config.level} ${config.role} question together. What would you like to know?`
+      }
+    ] : []
+
+    const apiHistory = [
+      ...contextMessages,
+      ...chatMessages.map(m => ({ role: m.role, content: m.text })),
+      { role: 'user', content: userText }
+    ]
+
+    // Add placeholder for streaming AI message
+    setChatMessages(prev => [...prev, { role: 'assistant', text: '', streaming: true }])
+
+    try {
+      const token = localStorage.getItem('token')
+      const baseURL = api.defaults.baseURL ?? '/api/v1'
+      const response = await fetch(`${baseURL}/ai/interview/stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          conversationHistory: apiHistory,
+          role: config.role,
+          level: config.level
+        })
+      })
+
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() // hold incomplete line for next chunk
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          const raw = line.slice(6).trim()
+          if (raw === '[DONE]') break
+          try {
+            const { text } = JSON.parse(raw)
+            setChatMessages(prev => {
+              const msgs = [...prev]
+              const last = msgs[msgs.length - 1]
+              return [...msgs.slice(0, -1), { ...last, text: last.text + text }]
+            })
+          } catch { /* ignore malformed chunks */ }
+        }
+      }
+    } catch (err) {
+      console.error(err)
+      setChatMessages(prev => {
+        const msgs = [...prev]
+        return [...msgs.slice(0, -1), { role: 'assistant', text: 'Sorry, something went wrong. Please try again.', streaming: false }]
+      })
+    } finally {
+      setChatMessages(prev => {
+        const msgs = [...prev]
+        const last = msgs[msgs.length - 1]
+        return [...msgs.slice(0, -1), { ...last, streaming: false }]
+      })
+      setChatStreaming(false)
+    }
   }
 
   const lineCount = answer ? answer.split('\n').length : 0
@@ -319,7 +426,7 @@ export default function AIInterview() {
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 56px)' }}>
 
-      {/* Top toolbar (LeetCode-style) */}
+      {/* Top toolbar */}
       <div
         className="flex items-center justify-between px-4 h-10 border-b shrink-0"
         style={{ backgroundColor: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}
@@ -340,6 +447,9 @@ export default function AIInterview() {
           <DiffBadge level={config.level} />
         </div>
         <div className="flex items-center gap-2">
+          {submitError && (
+            <span className="text-xs" style={{ color: 'var(--lc-hard)' }}>{submitError}</span>
+          )}
           <button
             onClick={submitAnswer}
             disabled={evaluating || !answer.trim()}
@@ -362,7 +472,7 @@ export default function AIInterview() {
       {/* Panels */}
       <div className="flex flex-1 overflow-hidden">
 
-        {/* ── Left panel: Description ─────────────────────────── */}
+        {/* ── Left panel ──────────────────────────────────────── */}
         <div
           className="w-5/12 flex flex-col border-r overflow-hidden"
           style={{ borderColor: 'var(--lc-border)' }}
@@ -374,7 +484,8 @@ export default function AIInterview() {
           >
             {[
               { id: 'description', label: 'Description' },
-              { id: 'hints', label: 'Hints' },
+              { id: 'hints',       label: 'Hints' },
+              { id: 'chat',        label: 'Ask AI' },
             ].map(t => (
               <button
                 key={t.id}
@@ -386,63 +497,158 @@ export default function AIInterview() {
                 }}
               >
                 {t.label}
+                {t.id === 'chat' && chatMessages.length > 0 && (
+                  <span
+                    className="ml-1.5 px-1.5 py-0.5 rounded-full text-xs"
+                    style={{ backgroundColor: 'var(--lc-orange-dim)', color: 'var(--lc-orange)' }}
+                  >
+                    {chatMessages.length}
+                  </span>
+                )}
               </button>
             ))}
           </div>
 
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto p-5">
-            {leftTab === 'description' && (
-              <div>
-                <h3 className="text-base font-semibold mb-3" style={{ color: 'var(--lc-text)' }}>
-                  {selected.question}
-                </h3>
+          {/* Content — description & hints scroll; chat is its own flex layout */}
+          {leftTab !== 'chat' ? (
+            <div className="flex-1 overflow-y-auto p-5">
+              {leftTab === 'description' && (
+                <div>
+                  <h3 className="text-base font-semibold mb-3" style={{ color: 'var(--lc-text)' }}>
+                    {selected.question}
+                  </h3>
 
-                <div
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs mb-5"
-                  style={{ backgroundColor: 'var(--lc-surface-3)', color: 'var(--lc-text-3)' }}
-                >
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                  </svg>
-                  Tests: {selected.tests}
+                  <div
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs mb-5"
+                    style={{ backgroundColor: 'var(--lc-surface-3)', color: 'var(--lc-text-3)' }}
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                    </svg>
+                    Tests: {selected.tests}
+                  </div>
+
+                  <div
+                    className="p-4 rounded-lg text-xs leading-relaxed"
+                    style={{ backgroundColor: 'var(--lc-surface-2)', color: 'var(--lc-text-2)' }}
+                  >
+                    <p className="font-medium mb-2" style={{ color: 'var(--lc-text)' }}>Context</p>
+                    <p>
+                      You are being interviewed for a <strong style={{ color: 'var(--lc-orange)' }}>{config.role}</strong> position
+                      at the <strong style={{ color: 'var(--lc-orange)' }}>{LEVEL_MAP[config.level]}</strong> level.
+                      Provide a thorough answer that demonstrates your depth of knowledge.
+                    </p>
+                  </div>
                 </div>
+              )}
 
-                <div
-                  className="p-4 rounded-lg text-xs leading-relaxed"
-                  style={{ backgroundColor: 'var(--lc-surface-2)', color: 'var(--lc-text-2)' }}
-                >
-                  <p className="font-medium mb-2" style={{ color: 'var(--lc-text)' }}>Context</p>
-                  <p>
-                    You are being interviewed for a <strong style={{ color: 'var(--lc-orange)' }}>{config.role}</strong> position
-                    at the <strong style={{ color: 'var(--lc-orange)' }}>{LEVEL_MAP[config.level]}</strong> level.
-                    Provide a thorough answer that demonstrates your depth of knowledge.
+              {leftTab === 'hints' && (
+                <div>
+                  <p className="text-xs font-medium mb-3" style={{ color: 'var(--lc-text-2)' }}>
+                    Key points to cover in your answer:
                   </p>
+                  <ul className="space-y-2">
+                    {selected.keyPoints.map((pt, i) => (
+                      <li key={i} className="flex items-start gap-2.5">
+                        <span
+                          className="shrink-0 mt-0.5 w-4 h-4 rounded-full flex items-center justify-center text-xs font-bold"
+                          style={{ backgroundColor: 'var(--lc-orange-dim)', color: 'var(--lc-orange)' }}
+                        >
+                          {i + 1}
+                        </span>
+                        <span className="text-xs leading-relaxed" style={{ color: 'var(--lc-text-2)' }}>{pt}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* ── Chat panel ─────────────────────────────────── */
+            <div className="flex-1 flex flex-col overflow-hidden">
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {chatMessages.length === 0 && (
+                  <div className="flex flex-col items-center justify-center h-full gap-2 pb-4">
+                    <div
+                      className="w-9 h-9 rounded-xl flex items-center justify-center"
+                      style={{ backgroundColor: 'var(--lc-orange-dim)', border: '1px solid rgba(255,161,22,0.3)' }}
+                    >
+                      <svg className="w-4 h-4" style={{ color: 'var(--lc-orange)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                      </svg>
+                    </div>
+                    <p className="text-xs font-medium" style={{ color: 'var(--lc-text-2)' }}>Ask the AI interviewer</p>
+                    <p className="text-xs text-center px-4" style={{ color: 'var(--lc-muted)' }}>
+                      Confused about the question? Ask for clarification, examples, or hints.
+                    </p>
+                  </div>
+                )}
+
+                {chatMessages.map((msg, i) => (
+                  <div
+                    key={i}
+                    className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div
+                      className="max-w-[85%] rounded-2xl px-3 py-2 text-xs leading-relaxed"
+                      style={{
+                        backgroundColor: msg.role === 'user' ? 'var(--lc-orange-dim)' : 'var(--lc-surface-2)',
+                        color: msg.role === 'user' ? 'var(--lc-orange)' : 'var(--lc-text-2)',
+                        border: `1px solid ${msg.role === 'user' ? 'rgba(255,161,22,0.3)' : 'var(--lc-border)'}`,
+                      }}
+                    >
+                      {msg.text || (msg.streaming && (
+                        <span className="flex gap-0.5 items-center h-4">
+                          {[0, 1, 2].map(d => (
+                            <span
+                              key={d}
+                              className="w-1 h-1 rounded-full animate-bounce"
+                              style={{ backgroundColor: 'var(--lc-muted)', animationDelay: `${d * 0.15}s` }}
+                            />
+                          ))}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* Input */}
+              <div
+                className="shrink-0 p-3 border-t"
+                style={{ borderColor: 'var(--lc-border)', backgroundColor: 'var(--lc-surface)' }}
+              >
+                <div className="flex gap-2 items-end">
+                  <textarea
+                    value={chatInput}
+                    onChange={e => setChatInput(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        sendChat()
+                      }
+                    }}
+                    placeholder="Ask about the question… (Enter to send)"
+                    rows={2}
+                    className="lc-input flex-1 resize-none text-xs"
+                    style={{ padding: '8px 10px', lineHeight: '1.5' }}
+                  />
+                  <button
+                    onClick={sendChat}
+                    disabled={!chatInput.trim() || chatStreaming}
+                    className="lc-btn-primary shrink-0"
+                    style={{ padding: '8px 10px' }}
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
+                  </button>
                 </div>
               </div>
-            )}
-
-            {leftTab === 'hints' && (
-              <div>
-                <p className="text-xs font-medium mb-3" style={{ color: 'var(--lc-text-2)' }}>
-                  Key points to cover in your answer:
-                </p>
-                <ul className="space-y-2">
-                  {selected.keyPoints.map((pt, i) => (
-                    <li key={i} className="flex items-start gap-2.5">
-                      <span
-                        className="shrink-0 mt-0.5 w-4 h-4 rounded-full flex items-center justify-center text-xs font-bold"
-                        style={{ backgroundColor: 'var(--lc-orange-dim)', color: 'var(--lc-orange)' }}
-                      >
-                        {i + 1}
-                      </span>
-                      <span className="text-xs leading-relaxed" style={{ color: 'var(--lc-text-2)' }}>{pt}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* ── Right panel: Answer / Results ───────────────────── */}

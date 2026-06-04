@@ -1,7 +1,7 @@
 const { verifyToken } = require('../utils/jwt')
 const { prisma } = require('../config/database')
 
-// In-memory room state: sessionId → { participants, code, language, messages }
+// In-memory room state
 const rooms = new Map()
 
 function getOrCreateRoom(sessionId) {
@@ -10,7 +10,8 @@ function getOrCreateRoom(sessionId) {
       participants: [],
       code: '',
       language: 'javascript',
-      messages: []
+      messages: [],
+      selectedProblem: null,
     })
   }
   return rooms.get(sessionId)
@@ -27,7 +28,7 @@ function setupRoomHandlers(io) {
 
       const user = await prisma.user.findUnique({
         where: { id: decoded.userId },
-        select: { id: true, name: true, role: true }
+        select: { id: true, name: true, role: true },
       })
 
       if (!user) return next(new Error('User not found'))
@@ -44,30 +45,33 @@ function setupRoomHandlers(io) {
       const room = getOrCreateRoom(sessionId)
 
       // Remove stale entry for this user (handles reconnects)
-      room.participants = room.participants.filter(p => p.userId !== socket.user.id)
+      room.participants = room.participants.filter(
+        (p) => p.userId !== socket.user.id
+      )
       room.participants.push({
         userId: socket.user.id,
         name: socket.user.name,
         role: socket.user.role,
-        socketId: socket.id
+        socketId: socket.id,
       })
 
       socket.join(sessionId)
       socket.sessionId = sessionId
 
-      // Send full room state to the joining user
+      // Send full room state including selected problem
       socket.emit('room-state', {
         participants: room.participants,
         code: room.code,
         language: room.language,
-        messages: room.messages
+        messages: room.messages,
+        selectedProblem: room.selectedProblem,
       })
 
-      // Notify others in the room
+      // Notify others
       socket.to(sessionId).emit('user-joined', {
         userId: socket.user.id,
         name: socket.user.name,
-        participants: room.participants
+        participants: room.participants,
       })
     })
 
@@ -95,7 +99,7 @@ function setupRoomHandlers(io) {
         name: socket.user.name,
         role: socket.user.role,
         message,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       }
 
       room.messages.push(msg)
@@ -109,7 +113,26 @@ function setupRoomHandlers(io) {
         userId: socket.user.id,
         name: socket.user.name,
         role: socket.user.role,
-        isTyping
+        isTyping,
+      })
+    })
+
+    // Interviewer/Admin selects a problem for the room
+    socket.on('select-problem', ({ sessionId, problemId }) => {
+      const room = rooms.get(sessionId)
+      if (!room) return
+
+      const isAllowed =
+        socket.user.role === 'INTERVIEWER' || socket.user.role === 'ADMIN'
+      if (!isAllowed) return
+
+      room.selectedProblem = problemId
+
+      // Broadcast to everyone in the room including sender
+      io.to(sessionId).emit('problem-selected', {
+        problemId,
+        selectedBy: socket.user.id,
+        selectedByName: socket.user.name,
       })
     })
 
@@ -120,12 +143,14 @@ function setupRoomHandlers(io) {
       const room = rooms.get(sessionId)
       if (!room) return
 
-      room.participants = room.participants.filter(p => p.socketId !== socket.id)
+      room.participants = room.participants.filter(
+        (p) => p.socketId !== socket.id
+      )
 
       socket.to(sessionId).emit('user-left', {
         userId: socket.user.id,
         name: socket.user.name,
-        participants: room.participants
+        participants: room.participants,
       })
 
       if (room.participants.length === 0) {

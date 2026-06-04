@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import SessionList from '../components/SessionList'
 import AIInterview from './AIInterview'
+import PerformanceChart from '../components/PerformanceChart'
+import api from '../api/axios'
 
 function LCLogo({ size = 30 }) {
   return (
@@ -20,22 +21,26 @@ const ROLE_BADGE = {
   CANDIDATE:   { label: 'Candidate',   bg: 'rgba(0,184,163,0.15)',   color: '#00b8a3' },
 }
 
+const DIFF_CFG = {
+  EASY:   { label: 'Easy',   color: '#00b8a3', bg: 'rgba(0,184,163,0.12)' },
+  MEDIUM: { label: 'Medium', color: '#ffc01e', bg: 'rgba(255,192,30,0.12)' },
+  HARD:   { label: 'Hard',   color: '#ff375f', bg: 'rgba(255,55,95,0.12)' },
+}
+
+const STATUS_CFG = {
+  SCHEDULED:   { label: 'Scheduled',   cls: 'lc-badge-blue',   dot: '#60a5fa', pulse: false },
+  IN_PROGRESS: { label: 'In Progress', cls: 'lc-badge-medium', dot: '#ffc01e', pulse: true  },
+  COMPLETED:   { label: 'Completed',   cls: 'lc-badge-easy',   dot: '#00b8a3', pulse: false },
+  CANCELLED:   { label: 'Cancelled',   cls: 'lc-badge-hard',   dot: '#ff375f', pulse: false },
+}
+
 const NAV_TABS = [
   {
-    id: 'sessions',
+    id: 'problems',
     label: 'Problems',
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-      </svg>
-    ),
-  },
-  {
-    id: 'ai',
-    label: 'AI Interview',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
       </svg>
     ),
   },
@@ -49,46 +54,294 @@ const NAV_TABS = [
     ),
     badge: true,
   },
+  {
+    id: 'ai',
+    label: 'AI Interview',
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+      </svg>
+    ),
+  },
+  {
+    id: 'performance',
+    label: 'Performance',
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+      </svg>
+    ),
+  },
 ]
 
-function LiveRoomsPanel({ navigate }) {
-  const [sessionId, setSessionId] = useState('')
+// ─── Problems List ────────────────────────────────────────────────────────────
+
+const DIFF_FILTERS = ['All', 'EASY', 'MEDIUM', 'HARD']
+
+function ProblemsPanel() {
+  const [problems, setProblems] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [diffFilter, setDiffFilter] = useState('All')
+  const [search, setSearch] = useState('')
+
+  useEffect(() => {
+    api.get('/problems')
+      .then(res => setProblems(res.data.data))
+      .catch(() => setError('Failed to load problems'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const visible = problems.filter(p => {
+    const matchDiff = diffFilter === 'All' || p.difficulty === diffFilter
+    const matchSearch = !search ||
+      p.title.toLowerCase().includes(search.toLowerCase()) ||
+      p.tags?.some(t => t.toLowerCase().includes(search.toLowerCase()))
+    return matchDiff && matchSearch
+  })
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 py-32">
+        <div
+          className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
+          style={{ borderColor: 'var(--lc-border)', borderTopColor: 'var(--lc-orange)' }}
+        />
+        <p className="text-xs" style={{ color: 'var(--lc-muted)' }}>Loading problems…</p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div
+        className="flex items-center gap-3 px-5 py-4 rounded-xl text-sm max-w-lg mx-auto mt-12"
+        style={{ backgroundColor: 'var(--lc-error-dim)', border: '1px solid rgba(255,55,95,0.3)', color: 'var(--lc-error)' }}
+      >
+        <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+        <div>
+          <p className="font-medium">Failed to load problems</p>
+          <p className="text-xs mt-0.5 opacity-70">{error}</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="max-w-lg mx-auto mt-8 flex flex-col gap-6">
-      {/* Hero */}
-      <div className="text-center flex flex-col items-center gap-3">
-        <div
-          className="w-14 h-14 rounded-2xl flex items-center justify-center"
-          style={{ backgroundColor: 'var(--lc-orange-dim)', border: '1px solid rgba(255,161,22,0.3)' }}
-        >
-          <svg className="w-7 h-7" style={{ color: 'var(--lc-orange)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.069A1 1 0 0121 8.882V15.118a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-          </svg>
+    <div>
+      {/* Toolbar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-3">
+          <h2 className="font-semibold text-base" style={{ color: 'var(--lc-text)' }}>Problem Set</h2>
+          <span
+            className="px-2 py-0.5 rounded-full text-xs"
+            style={{ backgroundColor: 'var(--lc-surface-3)', color: 'var(--lc-text-3)' }}
+          >
+            {problems.length}
+          </span>
         </div>
-        <div>
-          <h2 className="text-lg font-semibold" style={{ color: 'var(--lc-text)' }}>Live Interview Rooms</h2>
-          <p className="text-sm mt-1" style={{ color: 'var(--lc-text-3)' }}>
-            Join a session room to collaborate with a shared code editor and real-time chat.
-          </p>
+        <div className="relative">
+          <svg
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5"
+            style={{ color: 'var(--lc-muted)' }}
+            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search by title or tag…"
+            className="lc-input pl-8"
+            style={{ padding: '6px 12px 6px 30px', width: '220px' }}
+          />
         </div>
       </div>
 
-      {/* Quick join */}
+      {/* Difficulty filter */}
+      <div className="flex items-center gap-1.5 mb-4">
+        {DIFF_FILTERS.map(f => {
+          const d = DIFF_CFG[f]
+          return (
+            <button
+              key={f}
+              onClick={() => setDiffFilter(f)}
+              className="px-3 py-1 rounded-full text-xs font-medium border transition-all"
+              style={{
+                backgroundColor: diffFilter === f
+                  ? (d ? d.bg : 'var(--lc-orange-dim)')
+                  : 'transparent',
+                borderColor: diffFilter === f
+                  ? (d ? d.color : 'var(--lc-orange)')
+                  : 'var(--lc-border)',
+                color: diffFilter === f
+                  ? (d ? d.color : 'var(--lc-orange)')
+                  : 'var(--lc-text-3)',
+              }}
+            >
+              {f === 'All' ? 'All' : DIFF_CFG[f].label}
+              {f !== 'All' && (
+                <span className="ml-1 opacity-60">
+                  {problems.filter(p => p.difficulty === f).length}
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Table */}
       <div
-        className="rounded-xl border p-5 flex flex-col gap-4"
+        className="rounded-xl border overflow-hidden"
         style={{ backgroundColor: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}
       >
-        <p className="text-sm font-medium" style={{ color: 'var(--lc-text-2)' }}>Enter a Session ID to join its room</p>
+        {/* Header */}
+        <div
+          className="grid text-xs font-medium px-5 py-2.5 border-b"
+          style={{
+            gridTemplateColumns: '44px 1fr 100px auto',
+            color: 'var(--lc-text-3)',
+            borderColor: 'var(--lc-border)',
+            backgroundColor: 'var(--lc-surface-2)',
+          }}
+        >
+          <span>#</span>
+          <span>Title</span>
+          <span>Difficulty</span>
+          <span>Tags</span>
+        </div>
+
+        {visible.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-3">
+            <svg className="w-10 h-10" style={{ color: 'var(--lc-border-2)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <p className="text-sm" style={{ color: 'var(--lc-muted)' }}>No problems match your filter</p>
+          </div>
+        ) : (
+          visible.map((p, i) => {
+            const d = DIFF_CFG[p.difficulty] || DIFF_CFG.EASY
+            return (
+              <div
+                key={p.id}
+                className="grid items-center px-5 py-3.5 border-b last:border-b-0 text-sm transition-colors cursor-default"
+                style={{
+                  gridTemplateColumns: '44px 1fr 100px auto',
+                  borderColor: 'var(--lc-border)',
+                }}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--lc-surface-2)'}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                {/* Number */}
+                <span className="text-xs font-mono" style={{ color: 'var(--lc-muted)' }}>
+                  {i + 1}.
+                </span>
+
+                {/* Title */}
+                <span className="font-medium pr-4 truncate" style={{ color: 'var(--lc-text)' }}>
+                  {p.title}
+                </span>
+
+                {/* Difficulty */}
+                <span>
+                  <span
+                    className="text-xs font-medium px-2 py-0.5 rounded-full"
+                    style={{ backgroundColor: d.bg, color: d.color }}
+                  >
+                    {d.label}
+                  </span>
+                </span>
+
+                {/* Tags */}
+                <div className="flex gap-1 flex-wrap">
+                  {p.tags?.slice(0, 3).map(tag => (
+                    <span
+                      key={tag}
+                      className="text-xs px-1.5 py-0.5 rounded hidden sm:inline"
+                      style={{ backgroundColor: 'var(--lc-surface-3)', color: 'var(--lc-text-3)' }}
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )
+          })
+        )}
+      </div>
+
+      {visible.length > 0 && (
+        <p className="text-xs mt-3" style={{ color: 'var(--lc-text-3)' }}>
+          Showing {visible.length} of {problems.length} problems
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ─── Live Rooms Panel ─────────────────────────────────────────────────────────
+
+function LiveRoomsPanel({ navigate }) {
+  const [sessions, setSessions] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [sessionId, setSessionId] = useState('')
+  const [filter, setFilter] = useState('All')
+
+  useEffect(() => {
+    fetch('http://localhost:3000/api/v1/sessions')
+      .then(r => r.json())
+      .then(j => { if (j.success) setSessions(j.data.sessions) })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  const FILTERS = ['All', 'IN_PROGRESS', 'SCHEDULED']
+  const FILTER_LABELS = { All: 'All Sessions', IN_PROGRESS: 'Live Now', SCHEDULED: 'Upcoming' }
+
+  const visible = sessions.filter(s => filter === 'All' || s.status === filter)
+  const liveCount = sessions.filter(s => s.status === 'IN_PROGRESS').length
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="font-semibold text-base" style={{ color: 'var(--lc-text)' }}>Live Interview Rooms</h2>
+          <p className="text-xs mt-1" style={{ color: 'var(--lc-text-3)' }}>
+            Join a session to collaborate with shared code editor and real-time chat.
+          </p>
+        </div>
+        {liveCount > 0 && (
+          <div
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
+            style={{ backgroundColor: 'rgba(255,192,30,0.12)', color: '#ffc01e', border: '1px solid rgba(255,192,30,0.3)' }}
+          >
+            <span className="relative flex w-1.5 h-1.5">
+              <span className="absolute inline-flex h-full w-full rounded-full opacity-75 animate-ping" style={{ backgroundColor: '#ffc01e' }} />
+              <span className="relative w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#ffc01e' }} />
+            </span>
+            {liveCount} Live
+          </div>
+        )}
+      </div>
+
+      {/* Quick join by ID */}
+      <div
+        className="rounded-xl border p-4 flex flex-col gap-3"
+        style={{ backgroundColor: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}
+      >
+        <p className="text-xs font-medium" style={{ color: 'var(--lc-text-2)' }}>Quick Join by Session ID</p>
         <div className="flex gap-2">
           <input
             type="number"
             value={sessionId}
             onChange={e => setSessionId(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && sessionId && navigate(`/room/${sessionId}`)}
-            placeholder="Session ID (e.g. 3)"
+            placeholder="Enter session ID…"
             className="lc-input flex-1"
-            style={{ padding: '8px 12px' }}
+            style={{ padding: '7px 12px' }}
             min="1"
           />
           <button
@@ -106,42 +359,137 @@ function LiveRoomsPanel({ navigate }) {
         </div>
       </div>
 
-      {/* How it works */}
-      <div
-        className="rounded-xl border p-5 flex flex-col gap-3"
-        style={{ backgroundColor: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}
-      >
-        <p className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--lc-muted)' }}>
-          How it works
-        </p>
-        {[
-          { icon: '1', text: 'Find a session in the Problems tab and click Join next to it' },
-          { icon: '2', text: 'Both interviewer and candidate connect simultaneously via real-time WebSocket' },
-          { icon: '3', text: 'Collaborate on a shared code editor with live chat' },
-        ].map(item => (
-          <div key={item.icon} className="flex items-start gap-3">
-            <span
-              className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5"
-              style={{ backgroundColor: 'var(--lc-orange-dim)', color: 'var(--lc-orange)' }}
+      {/* Session list */}
+      <div>
+        {/* Filter pills */}
+        <div className="flex items-center gap-1.5 mb-4">
+          {FILTERS.map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className="px-3 py-1 rounded-full text-xs font-medium border transition-all"
+              style={{
+                backgroundColor: filter === f ? 'var(--lc-orange-dim)' : 'transparent',
+                borderColor: filter === f ? 'var(--lc-orange)' : 'var(--lc-border)',
+                color: filter === f ? 'var(--lc-orange)' : 'var(--lc-text-3)',
+              }}
             >
-              {item.icon}
-            </span>
-            <p className="text-sm" style={{ color: 'var(--lc-text-3)' }}>{item.text}</p>
-          </div>
-        ))}
-      </div>
+              {FILTER_LABELS[f]}
+              {f !== 'All' && (
+                <span className="ml-1 opacity-60">
+                  {sessions.filter(s => s.status === f).length}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
 
-      <p className="text-xs text-center" style={{ color: 'var(--lc-muted)' }}>
-        Or click the <strong style={{ color: 'var(--lc-orange)' }}>Join</strong> button on any session in the Problems tab.
-      </p>
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <div
+              className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin"
+              style={{ borderColor: 'var(--lc-border)', borderTopColor: 'var(--lc-orange)' }}
+            />
+          </div>
+        ) : visible.length === 0 ? (
+          <div
+            className="rounded-xl border p-10 flex flex-col items-center gap-3"
+            style={{ backgroundColor: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}
+          >
+            <svg className="w-10 h-10" style={{ color: 'var(--lc-border-2)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.069A1 1 0 0121 8.882V15.118a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            <p className="text-sm" style={{ color: 'var(--lc-muted)' }}>No sessions available</p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {visible.map(session => {
+              const s = STATUS_CFG[session.status] || STATUS_CFG.SCHEDULED
+              const isLive = session.status === 'IN_PROGRESS'
+              return (
+                <div
+                  key={session.id}
+                  className="rounded-xl border p-4 flex items-center gap-4 transition-all"
+                  style={{
+                    backgroundColor: 'var(--lc-surface)',
+                    borderColor: isLive ? 'rgba(255,192,30,0.3)' : 'var(--lc-border)',
+                    boxShadow: isLive ? '0 0 0 1px rgba(255,192,30,0.1)' : 'none',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--lc-surface-2)'}
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--lc-surface)'}
+                >
+                  {/* Status dot */}
+                  <span className="relative flex w-2.5 h-2.5 shrink-0">
+                    {s.pulse && (
+                      <span
+                        className="absolute inline-flex h-full w-full rounded-full opacity-60 animate-ping"
+                        style={{ backgroundColor: s.dot }}
+                      />
+                    )}
+                    <span className="relative w-2.5 h-2.5 rounded-full" style={{ backgroundColor: s.dot }} />
+                  </span>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="text-sm font-medium truncate" style={{ color: 'var(--lc-text)' }}>
+                        {session.title}
+                      </span>
+                      <span className={`lc-badge ${s.cls} shrink-0`}>{s.label}</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--lc-text-3)' }}>
+                      <span>{session.role}</span>
+                      <span
+                        className="px-1.5 py-0.5 rounded font-mono"
+                        style={{ backgroundColor: 'var(--lc-surface-3)', color: 'var(--lc-orange)' }}
+                      >
+                        {session.level}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span
+                          className="w-4 h-4 rounded-full flex items-center justify-center text-xs font-bold"
+                          style={{ backgroundColor: 'rgba(255,161,22,0.15)', color: 'var(--lc-orange)' }}
+                        >
+                          {session.candidate?.name?.charAt(0)?.toUpperCase() || '?'}
+                        </span>
+                        {session.candidate?.name}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Join button */}
+                  <button
+                    onClick={() => navigate(`/room/${session.id}`)}
+                    className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all"
+                    style={{
+                      backgroundColor: isLive ? '#ffc01e' : 'var(--lc-orange-dim)',
+                      color: isLive ? '#1a1a1a' : 'var(--lc-orange)',
+                      border: isLive ? 'none' : '1px solid rgba(255,161,22,0.3)',
+                    }}
+                    onMouseEnter={e => !isLive && (e.currentTarget.style.backgroundColor = 'rgba(255,161,22,0.25)')}
+                    onMouseLeave={e => !isLive && (e.currentTarget.style.backgroundColor = 'var(--lc-orange-dim)')}
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.069A1 1 0 0121 8.882V15.118a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    {isLive ? 'Join Live' : 'Join Room'}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
 
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+
 export default function Dashboard() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState('sessions')
+  const [activeTab, setActiveTab] = useState('problems')
 
   const badge = ROLE_BADGE[user?.role] || { label: user?.role, bg: 'rgba(128,128,128,0.15)', color: '#808080' }
   const initials = user?.name?.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || 'U'
@@ -156,7 +504,6 @@ export default function Dashboard() {
       >
         {/* Left: Logo + nav tabs */}
         <div className="flex items-center gap-1">
-          {/* Logo */}
           <div className="flex items-center gap-2 mr-4">
             <LCLogo size={26} />
             <span className="font-semibold text-sm hidden sm:block" style={{ color: 'var(--lc-text)' }}>
@@ -164,15 +511,12 @@ export default function Dashboard() {
             </span>
           </div>
 
-          {/* Tabs */}
           {NAV_TABS.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className="relative flex items-center gap-1.5 px-3 h-14 text-sm font-medium transition-colors"
-              style={{
-                color: activeTab === tab.id ? 'var(--lc-text)' : 'var(--lc-text-3)',
-              }}
+              style={{ color: activeTab === tab.id ? 'var(--lc-text)' : 'var(--lc-text-3)' }}
               onMouseEnter={e => { if (activeTab !== tab.id) e.currentTarget.style.color = 'var(--lc-text-2)' }}
               onMouseLeave={e => { if (activeTab !== tab.id) e.currentTarget.style.color = 'var(--lc-text-3)' }}
             >
@@ -196,28 +540,21 @@ export default function Dashboard() {
 
         {/* Right: User info + logout */}
         <div className="flex items-center gap-3">
-          {/* Role badge */}
           <span
             className="hidden sm:inline-flex lc-badge text-xs"
             style={{ backgroundColor: badge.bg, color: badge.color }}
           >
             {badge.label}
           </span>
-
-          {/* User name */}
           <span className="hidden md:block text-xs" style={{ color: 'var(--lc-text-2)' }}>
             {user?.name}
           </span>
-
-          {/* Avatar */}
           <div
             className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold select-none"
             style={{ backgroundColor: 'var(--lc-orange-dim)', color: 'var(--lc-orange)', border: '1px solid rgba(255,161,22,0.3)' }}
           >
             {initials}
           </div>
-
-          {/* Logout */}
           <button
             onClick={logout}
             className="lc-btn-ghost text-xs"
@@ -234,9 +571,10 @@ export default function Dashboard() {
 
       {/* ── Content ──────────────────────────────────────────────── */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6">
-        {activeTab === 'sessions' && <SessionList />}
-        {activeTab === 'ai'       && <AIInterview />}
-        {activeTab === 'live'     && <LiveRoomsPanel navigate={navigate} />}
+        {activeTab === 'problems'     && <ProblemsPanel />}
+        {activeTab === 'live'         && <LiveRoomsPanel navigate={navigate} />}
+        {activeTab === 'ai'           && <AIInterview />}
+        {activeTab === 'performance'  && <PerformanceChart />}
       </main>
     </div>
   )

@@ -1,6 +1,7 @@
 const ApiResponse = require('../utils/apiResponse')
 const asyncHandler = require('../middleware/asyncHandler')
 const aiService = require('../services/aiService')
+const { prisma } = require('../config/database')
 
 // POST /api/v1/ai/questions
 const generateQuestions = asyncHandler(async (req, res) => {
@@ -25,7 +26,7 @@ const generateQuestions = asyncHandler(async (req, res) => {
 
 // POST /api/v1/ai/evaluate
 const evaluateAnswer = asyncHandler(async (req, res) => {
-  const { question, answer, role, level } = req.body
+  const { question, answer, role, level, topic } = req.body
 
   if (!question || !answer || !role || !level) {
     return ApiResponse.badRequest(
@@ -40,6 +41,23 @@ const evaluateAnswer = asyncHandler(async (req, res) => {
     role,
     level
   )
+
+  // Persist evaluation for performance tracking
+  await prisma.aIEvaluation.create({
+    data: {
+      userId: req.user.id,
+      question,
+      answer,
+      role,
+      level,
+      topic: topic || 'General',
+      score: evaluation.score,
+      grade: evaluation.grade,
+      strengths: evaluation.strengths,
+      improvements: evaluation.improvements,
+      idealAnswer: evaluation.idealAnswer,
+    }
+  })
 
   ApiResponse.success(res, evaluation, 'Answer evaluated successfully')
 })

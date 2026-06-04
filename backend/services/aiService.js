@@ -8,12 +8,12 @@ const client = new Anthropic({
 // Generate interview questions for a role and level
 const generateInterviewQuestions = async (role, level, topic, count = 5) => {
   const message = await client.messages.create({
-    model: 'claude-opus-4-5',
+    model: 'claude-opus-4-8',
     max_tokens: 2000,
     messages: [
       {
         role: 'user',
-        content: `You are a senior engineer at a top tech company conducting 
+        content: `You are a senior engineer at a top tech company conducting
 a technical interview for a ${role} position at ${level} level.
 
 Generate exactly ${count} interview questions about: ${topic}
@@ -40,7 +40,6 @@ Return ONLY the JSON. No extra text.`
     ]
   })
 
-  // Parse the JSON response
   const content = message.content[0].text
   return JSON.parse(content)
 }
@@ -48,7 +47,7 @@ Return ONLY the JSON. No extra text.`
 // Evaluate a candidate's answer
 const evaluateAnswer = async (question, answer, role, level) => {
   const message = await client.messages.create({
-    model: 'claude-opus-4-5',
+    model: 'claude-opus-4-8',
     max_tokens: 1500,
     messages: [
       {
@@ -99,22 +98,20 @@ const streamInterviewerResponse = async (
   res.setHeader('Connection', 'keep-alive')
 
   const stream = await client.messages.stream({
-    model: 'claude-opus-4-5',
+    model: 'claude-opus-4-8',
     max_tokens: 1000,
-    system: `You are an expert technical interviewer conducting a 
-${level} level interview for a ${role} position. 
+    system: `You are an expert technical interviewer conducting a
+${level} level interview for a ${role} position.
 Ask focused follow-up questions based on candidate responses.
 Be professional but conversational. One question at a time.`,
     messages: conversationHistory
   })
 
-  // Stream each chunk to the client as it arrives
   for await (const chunk of stream) {
     if (
       chunk.type === 'content_block_delta' &&
       chunk.delta.type === 'text_delta'
     ) {
-      // Server-Sent Events format
       res.write(`data: ${JSON.stringify({ text: chunk.delta.text })}\n\n`)
     }
   }

@@ -23,6 +23,24 @@ model User {
   // Relations
   hostedSessions   InterviewSession[] @relation("Interviewer")
   attendedSessions InterviewSession[] @relation("Candidate")
+  evaluations      AIEvaluation[]
+}
+
+model AIEvaluation {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question     String
+  answer       String
+  role         String
+  level        String
+  topic        String
+  score        Float
+  grade        String
+  strengths    String[]
+  improvements String[]
+  idealAnswer  String
+  createdAt    DateTime @default(now())
 }
 
 model InterviewSession {
@@ -53,4 +71,25 @@ enum SessionStatus {
   IN_PROGRESS
   COMPLETED
   CANCELLED
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+model Problem {
+  id          Int        @id @default(autoincrement())
+  title       String
+  slug        String     @unique
+  difficulty  Difficulty
+  description String
+  examples    Json
+  constraints String[]
+  testCases   Json
+  starterCode Json
+  tags        String[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 }
