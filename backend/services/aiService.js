@@ -1,5 +1,6 @@
 const Anthropic = require('@anthropic-ai/sdk')
 const config = require('../config/config')
+const cache = require('./cacheService')
 
 const client = new Anthropic({
   apiKey: config.ANTHROPIC_API_KEY
@@ -7,6 +8,10 @@ const client = new Anthropic({
 
 // Generate interview questions for a role and level
 const generateInterviewQuestions = async (role, level, topic, count = 5) => {
+  const cacheKey = `questions:${role}:${level}:${topic}:${count}`.toLowerCase()
+  const cached = await cache.get(cacheKey)
+  if (cached) return cached
+
   const message = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 2000,
@@ -41,7 +46,9 @@ Return ONLY the JSON. No extra text.`
   })
 
   const raw = message.content[0].text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
-  return JSON.parse(raw)
+  const result = JSON.parse(raw)
+  await cache.set(cacheKey, result, cache.TTL.QUESTIONS)
+  return result
 }
 
 // Evaluate a candidate's answer

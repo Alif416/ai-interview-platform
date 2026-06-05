@@ -4,6 +4,7 @@ const ApiResponse = require('../utils/apiResponse')
 const asyncHandler = require('../middleware/asyncHandler')
 const { prisma } = require('../config/database')
 const NEETCODE_SLUGS = require('../data/neetcode250Slugs')
+const cache = require('../services/cacheService')
 
 const LEETCODE_GRAPHQL = 'https://leetcode.com/graphql'
 const PROBLEM_QUERY = `
@@ -70,6 +71,10 @@ const getAllProblems = asyncHandler(async (req, res) => {
     : undefined
   const search = req.query.search?.trim() || undefined
 
+  const cacheKey = `problems:list:${page}:${limit}:${difficulty || ''}:${search || ''}`
+  const cached = await cache.get(cacheKey)
+  if (cached) return ApiResponse.success(res, cached, 'Problems fetched successfully')
+
   const where = {
     ...(difficulty && { difficulty }),
     ...(search && {
@@ -91,21 +96,23 @@ const getAllProblems = asyncHandler(async (req, res) => {
     }),
   ])
 
-  ApiResponse.success(res, {
-    problems,
-    total,
-    page,
-    limit,
-    totalPages: Math.ceil(total / limit),
-  }, 'Problems fetched successfully')
+  const result = { problems, total, page, limit, totalPages: Math.ceil(total / limit) }
+  await cache.set(cacheKey, result, cache.TTL.PROBLEMS_LIST)
+
+  ApiResponse.success(res, result, 'Problems fetched successfully')
 })
 
 // GET /api/v1/problems/:id
 const getProblemById = asyncHandler(async (req, res) => {
-  const problem = await prisma.problem.findUnique({
-    where: { id: Number(req.params.id) },
-  })
+  const id = Number(req.params.id)
+  const cacheKey = `problems:id:${id}`
+  const cached = await cache.get(cacheKey)
+  if (cached) return ApiResponse.success(res, cached, 'Problem fetched successfully')
+
+  const problem = await prisma.problem.findUnique({ where: { id } })
   if (!problem) return ApiResponse.notFound(res, 'Problem not found')
+
+  await cache.set(cacheKey, problem, cache.TTL.PROBLEM)
   ApiResponse.success(res, problem, 'Problem fetched successfully')
 })
 
@@ -220,6 +227,8 @@ const syncProblems = asyncHandler(async (req, res) => {
       await new Promise(r => setTimeout(r, 300))
     }
   }
+
+  await cache.delByPattern('problems:*')
 
   ApiResponse.success(
     res,

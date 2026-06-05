@@ -7,7 +7,8 @@ const config = {
   DATABASE_URL: process.env.DATABASE_URL,
   JWT_SECRET: process.env.JWT_SECRET,
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '7d',
-  ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY
+  ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+  REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379'
 }
 
 module.exports = config
