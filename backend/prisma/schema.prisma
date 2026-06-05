@@ -41,6 +41,9 @@ model AIEvaluation {
   improvements String[]
   idealAnswer  String
   createdAt    DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, topic])
 }
 
 model InterviewSession {
@@ -58,6 +61,10 @@ model InterviewSession {
   candidateId   Int
   interviewer   User @relation("Interviewer", fields: [interviewerId], references: [id])
   candidate     User @relation("Candidate", fields: [candidateId], references: [id])
+
+  @@index([interviewerId, scheduledAt])
+  @@index([candidateId])
+  @@index([status])
 }
 
 enum UserRole {

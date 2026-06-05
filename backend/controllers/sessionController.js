@@ -2,25 +2,39 @@ const ApiResponse = require('../utils/apiResponse')
 const asyncHandler = require('../middleware/asyncHandler')
 const { prisma } = require('../config/database')
 
-// GET /api/v1/sessions
+// GET /api/v1/sessions?page=1&limit=20&status=SCHEDULED&role=engineer
 const getAllSessions = asyncHandler(async (req, res) => {
   const { status, role } = req.query
+  const page  = Math.max(1, parseInt(req.query.page)  || 1)
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20))
 
-  const sessions = await prisma.interviewSession.findMany({
-    where: {
-      ...(status && { status: status.toUpperCase() }),
-      ...(role && { role: { contains: role, mode: 'insensitive' } })
-    },
-    include: {
-      interviewer: { select: { id: true, name: true, email: true } },
-      candidate: { select: { id: true, name: true, email: true } }
-    },
-    orderBy: { scheduledAt: 'asc' }
-  })
+  const where = {
+    ...(status && { status: status.toUpperCase() }),
+    ...(role && { role: { contains: role, mode: 'insensitive' } }),
+  }
+
+  const [total, sessions] = await Promise.all([
+    prisma.interviewSession.count({ where }),
+    prisma.interviewSession.findMany({
+      where,
+      select: {
+        id: true, title: true, role: true, level: true,
+        status: true, scheduledAt: true, createdAt: true,
+        interviewer: { select: { id: true, name: true, email: true } },
+        candidate:   { select: { id: true, name: true, email: true } },
+      },
+      orderBy: { scheduledAt: 'asc' },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+  ])
 
   ApiResponse.success(res, {
     sessions,
-    count: sessions.length
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
   }, 'Sessions retrieved successfully')
 })
 
@@ -64,10 +78,10 @@ const createSession = asyncHandler(async (req, res) => {
     return ApiResponse.badRequest(res, 'Validation failed', errors)
   }
 
-  // Check users exist
+  // Check users exist — select only id to avoid fetching unnecessary fields
   const [interviewer, candidate] = await Promise.all([
-    prisma.user.findUnique({ where: { id: interviewerId } }),
-    prisma.user.findUnique({ where: { id: candidateId } })
+    prisma.user.findUnique({ where: { id: interviewerId }, select: { id: true } }),
+    prisma.user.findUnique({ where: { id: candidateId },   select: { id: true } }),
   ])
 
   if (!interviewer) return ApiResponse.notFound(res, 'Interviewer not found')
