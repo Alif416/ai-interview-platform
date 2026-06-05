@@ -2,6 +2,7 @@ const express = require('express')
 const config = require('./config/config')
 const logger = require('./middleware/logger')
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler')
+const { globalLimiter } = require('./middleware/rateLimit')
 const routes = require('./routes/index')
 const cors = require('cors')
 const app = express()
@@ -10,6 +11,7 @@ const app = express()
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 app.use(logger)
+app.use(globalLimiter)
 
 app.use(cors({
   origin: 'http://localhost:5173',

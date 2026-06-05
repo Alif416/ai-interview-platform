@@ -1,16 +1,16 @@
-# 🤖 AI-Powered Collaborative Interview Platform
+# AI-Powered Collaborative Interview Platform
 
 A full-stack, production-grade interview platform
 built with Node.js, React, PostgreSQL and Generative AI.
 
-## 🚀 Features
+## Features
 
 - AI-generated contextual interview questions
 - Real-time collaborative coding environment
 - Performance analytics and feedback reports
 - JWT-based authentication system
 
-## 🛠 Tech Stack
+## Tech Stack
 
 - **Frontend:** React, Next.js, TypeScript, Tailwind CSS
 - **Backend:** Node.js, Express, PostgreSQL, Prisma
@@ -18,7 +18,7 @@ built with Node.js, React, PostgreSQL and Generative AI.
 - **Real-time:** Socket.io
 - **Deployment:** Vercel + Railway
 
-## 📅 Status
+## Status
 
 🚧 Currently in active development
 
