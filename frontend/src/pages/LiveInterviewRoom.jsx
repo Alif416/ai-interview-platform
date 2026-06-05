@@ -1046,63 +1046,24 @@ export default function LiveInterviewRoom() {
         </div>
       )}
 
-      {/* ── Mobile tab bar ──────────────────────────────────────────────── */}
-      <div
-        className="shrink-0 flex border-b"
-        style={{ backgroundColor: 'var(--lc-nav)', borderColor: 'var(--lc-border)' }}
-      >
-        {[
-          { id: 'problem', label: 'Problem', icon: '📋' },
-          { id: 'code', label: 'Code', icon: '💻' },
-          { id: 'chat', label: 'Chat', icon: '💬', badge: unreadCount },
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => { setMobileTab(tab.id); if (tab.id === 'chat') setUnreadCount(0) }}
-            className="relative flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-colors"
-            style={{
-              color: mobileTab === tab.id ? 'var(--lc-orange)' : 'var(--lc-text-3)',
-              borderBottom: mobileTab === tab.id ? '2px solid var(--lc-orange)' : '2px solid transparent',
-            }}
-          >
-            {tab.label}
-            {tab.badge > 0 && (
-              <span
-                className="absolute top-1.5 right-1/4 min-w-3.5 h-3.5 px-0.5 rounded-full flex items-center justify-center text-xs font-bold"
-                style={{ backgroundColor: 'var(--lc-orange)', color: '#1a1a1a', fontSize: '9px' }}
-              >
-                {tab.badge}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-
       {/* ── Main 3-pane layout ──────────────────────────────────────────── */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
 
         {/* ── Problem Panel ─────────────────────────────────────────────── */}
         <div
-          className={`flex-col border-r min-h-0 ${mobileTab === 'problem' ? 'flex' : 'hidden'}`}
+          className="flex flex-col border-r min-h-0 shrink-0"
           style={{
-            width: '100%',
-            maxWidth: '100%',
+            width: '300px',
             borderColor: 'var(--lc-border)',
             backgroundColor: 'var(--lc-surface)',
           }}
         >
-          <style>{`@media (min-width: 1024px) { .problem-pane { width: 300px !important; max-width: 300px !important; flex-shrink: 0 !important; } }`}</style>
-          <div
-            className="problem-pane flex flex-col min-h-0 h-full"
-            style={{ width: '100%', maxWidth: '100%' }}
-          >
-            <ProblemPanel problem={problem} user={user} onSelectProblem={openPicker} />
-          </div>
+          <ProblemPanel problem={problem} user={user} onSelectProblem={openPicker} />
         </div>
 
         {/* ── Code Editor + Results ──────────────────────────────────────── */}
         <div
-          className={`flex-col flex-1 min-h-0 min-w-0 ${mobileTab === 'code' ? 'flex' : 'hidden'}`}
+          className="flex flex-col flex-1 min-h-0 min-w-0"
           style={{ borderRight: '1px solid var(--lc-border)' }}
         >
           {/* Editor toolbar */}
@@ -1210,11 +1171,10 @@ export default function LiveInterviewRoom() {
 
         {/* ── Chat Panel ────────────────────────────────────────────────── */}
         <div
-          className={`flex-col min-h-0 ${mobileTab === 'chat' ? 'flex' : 'hidden'}`}
-          style={{ width: '100%', maxWidth: '100%', backgroundColor: 'var(--lc-surface)' }}
+          className="flex flex-col min-h-0 shrink-0"
+          style={{ width: '300px', backgroundColor: 'var(--lc-surface)' }}
         >
-          <style>{`@media (min-width: 1024px) { .chat-pane { width: 300px !important; max-width: 300px !important; flex-shrink: 0 !important; } }`}</style>
-          <div className="chat-pane flex flex-col min-h-0 h-full">
+          <div className="flex flex-col min-h-0 h-full">
 
             {/* Participants strip */}
             <div
