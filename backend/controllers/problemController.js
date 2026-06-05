@@ -61,19 +61,43 @@ function transformQuestion(q) {
   }
 }
 
-// GET /api/v1/problems
+// GET /api/v1/problems?page=1&limit=20&difficulty=EASY&search=two+sum
 const getAllProblems = asyncHandler(async (req, res) => {
-  const problems = await prisma.problem.findMany({
-    select: {
-      id: true,
-      title: true,
-      slug: true,
-      difficulty: true,
-      tags: true,
-    },
-    orderBy: [{ difficulty: 'asc' }, { id: 'asc' }],
-  })
-  ApiResponse.success(res, problems, 'Problems fetched successfully')
+  const page       = Math.max(1, parseInt(req.query.page)  || 1)
+  const limit      = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20))
+  const difficulty = ['EASY', 'MEDIUM', 'HARD'].includes(req.query.difficulty)
+    ? req.query.difficulty
+    : undefined
+  const search = req.query.search?.trim() || undefined
+
+  const where = {
+    ...(difficulty && { difficulty }),
+    ...(search && {
+      OR: [
+        { title: { contains: search, mode: 'insensitive' } },
+        { tags:  { has: search } },
+      ],
+    }),
+  }
+
+  const [total, problems] = await Promise.all([
+    prisma.problem.count({ where }),
+    prisma.problem.findMany({
+      where,
+      select: { id: true, title: true, slug: true, difficulty: true, tags: true },
+      orderBy: [{ difficulty: 'asc' }, { id: 'asc' }],
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+  ])
+
+  ApiResponse.success(res, {
+    problems,
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
+  }, 'Problems fetched successfully')
 })
 
 // GET /api/v1/problems/:id

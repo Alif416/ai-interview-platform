@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import AIInterview from './AIInterview'
@@ -78,25 +78,48 @@ const NAV_TABS = [
 
 const DIFF_FILTERS = ['All', 'EASY', 'MEDIUM', 'HARD']
 
+const PAGE_SIZE = 20
+
 function ProblemsPanel() {
-  const [problems, setProblems] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [problems, setProblems]     = useState([])
+  const [total, setTotal]           = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+  const [page, setPage]             = useState(1)
+  const [loading, setLoading]       = useState(true)
+  const [error, setError]           = useState(null)
   const [diffFilter, setDiffFilter] = useState('All')
-  const [search, setSearch] = useState('')
-  const [syncing, setSyncing] = useState(false)
+  const [search, setSearch]         = useState('')
+  const [searchInput, setSearchInput] = useState('')
+  const [syncing, setSyncing]       = useState(false)
   const [syncResult, setSyncResult] = useState(null)
 
-  const loadProblems = () => {
+  // Debounce search input → search state
+  useEffect(() => {
+    const t = setTimeout(() => { setSearch(searchInput); setPage(1) }, 400)
+    return () => clearTimeout(t)
+  }, [searchInput])
+
+  // Reset to page 1 when filter changes
+  useEffect(() => { setPage(1) }, [diffFilter])
+
+  const loadProblems = useCallback((pg, diff, srch) => {
     setLoading(true)
     setError(null)
-    api.get('/problems')
-      .then(res => setProblems(res.data.data))
+    const params = new URLSearchParams({ page: pg, limit: PAGE_SIZE })
+    if (diff !== 'All') params.set('difficulty', diff)
+    if (srch) params.set('search', srch)
+    api.get(`/problems?${params}`)
+      .then(res => {
+        const d = res.data.data
+        setProblems(d.problems)
+        setTotal(d.total)
+        setTotalPages(d.totalPages)
+      })
       .catch(() => setError('Failed to load problems'))
       .finally(() => setLoading(false))
-  }
+  }, [])
 
-  useEffect(() => { loadProblems() }, [])
+  useEffect(() => { loadProblems(page, diffFilter, search) }, [page, diffFilter, search, loadProblems])
 
   const syncNeetcode = async () => {
     setSyncing(true)
@@ -104,32 +127,13 @@ function ProblemsPanel() {
     try {
       const { data } = await api.post('/problems/sync')
       setSyncResult({ ok: true, message: data.message })
-      loadProblems()
+      loadProblems(1, diffFilter, search)
+      setPage(1)
     } catch (e) {
       setSyncResult({ ok: false, message: e.response?.data?.message || 'Sync failed' })
     } finally {
       setSyncing(false)
     }
-  }
-
-  const visible = problems.filter(p => {
-    const matchDiff = diffFilter === 'All' || p.difficulty === diffFilter
-    const matchSearch = !search ||
-      p.title.toLowerCase().includes(search.toLowerCase()) ||
-      p.tags?.some(t => t.toLowerCase().includes(search.toLowerCase()))
-    return matchDiff && matchSearch
-  })
-
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-3 py-32">
-        <div
-          className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
-          style={{ borderColor: 'var(--lc-border)', borderTopColor: 'var(--lc-orange)' }}
-        />
-        <p className="text-xs" style={{ color: 'var(--lc-muted)' }}>Loading problems…</p>
-      </div>
-    )
   }
 
   if (error) {
@@ -159,7 +163,7 @@ function ProblemsPanel() {
             className="px-2 py-0.5 rounded-full text-xs"
             style={{ backgroundColor: 'var(--lc-surface-3)', color: 'var(--lc-text-3)' }}
           >
-            {problems.length}
+            {total}
           </span>
           <button
             onClick={syncNeetcode}
@@ -201,8 +205,8 @@ function ProblemsPanel() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
+            value={searchInput}
+            onChange={e => setSearchInput(e.target.value)}
             placeholder="Search by title or tag…"
             className="lc-input pl-8"
             style={{ padding: '6px 12px 6px 30px', width: '220px' }}
@@ -220,23 +224,12 @@ function ProblemsPanel() {
               onClick={() => setDiffFilter(f)}
               className="px-3 py-1 rounded-full text-xs font-medium border transition-all"
               style={{
-                backgroundColor: diffFilter === f
-                  ? (d ? d.bg : 'var(--lc-orange-dim)')
-                  : 'transparent',
-                borderColor: diffFilter === f
-                  ? (d ? d.color : 'var(--lc-orange)')
-                  : 'var(--lc-border)',
-                color: diffFilter === f
-                  ? (d ? d.color : 'var(--lc-orange)')
-                  : 'var(--lc-text-3)',
+                backgroundColor: diffFilter === f ? (d ? d.bg : 'var(--lc-orange-dim)') : 'transparent',
+                borderColor:     diffFilter === f ? (d ? d.color : 'var(--lc-orange)') : 'var(--lc-border)',
+                color:           diffFilter === f ? (d ? d.color : 'var(--lc-orange)') : 'var(--lc-text-3)',
               }}
             >
               {f === 'All' ? 'All' : DIFF_CFG[f].label}
-              {f !== 'All' && (
-                <span className="ml-1 opacity-60">
-                  {problems.filter(p => p.difficulty === f).length}
-                </span>
-              )}
             </button>
           )
         })}
@@ -263,7 +256,15 @@ function ProblemsPanel() {
           <span>Tags</span>
         </div>
 
-        {visible.length === 0 ? (
+        {loading ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-16">
+            <div
+              className="w-7 h-7 rounded-full border-2 border-t-transparent animate-spin"
+              style={{ borderColor: 'var(--lc-border)', borderTopColor: 'var(--lc-orange)' }}
+            />
+            <p className="text-xs" style={{ color: 'var(--lc-muted)' }}>Loading problems…</p>
+          </div>
+        ) : problems.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-3">
             <svg className="w-10 h-10" style={{ color: 'var(--lc-border-2)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -271,47 +272,31 @@ function ProblemsPanel() {
             <p className="text-sm" style={{ color: 'var(--lc-muted)' }}>No problems match your filter</p>
           </div>
         ) : (
-          visible.map((p, i) => {
+          problems.map((p, i) => {
             const d = DIFF_CFG[p.difficulty] || DIFF_CFG.EASY
             return (
               <div
                 key={p.id}
                 className="grid items-center px-5 py-3.5 border-b last:border-b-0 text-sm transition-colors cursor-default"
-                style={{
-                  gridTemplateColumns: '44px 1fr 100px auto',
-                  borderColor: 'var(--lc-border)',
-                }}
+                style={{ gridTemplateColumns: '44px 1fr 100px auto', borderColor: 'var(--lc-border)' }}
                 onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--lc-surface-2)'}
                 onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
               >
-                {/* Number */}
                 <span className="text-xs font-mono" style={{ color: 'var(--lc-muted)' }}>
-                  {i + 1}.
+                  {(page - 1) * PAGE_SIZE + i + 1}.
                 </span>
-
-                {/* Title */}
                 <span className="font-medium pr-4 truncate" style={{ color: 'var(--lc-text)' }}>
                   {p.title}
                 </span>
-
-                {/* Difficulty */}
                 <span>
-                  <span
-                    className="text-xs font-medium px-2 py-0.5 rounded-full"
-                    style={{ backgroundColor: d.bg, color: d.color }}
-                  >
+                  <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ backgroundColor: d.bg, color: d.color }}>
                     {d.label}
                   </span>
                 </span>
-
-                {/* Tags */}
                 <div className="flex gap-1 flex-wrap">
                   {p.tags?.slice(0, 3).map(tag => (
-                    <span
-                      key={tag}
-                      className="text-xs px-1.5 py-0.5 rounded hidden sm:inline"
-                      style={{ backgroundColor: 'var(--lc-surface-3)', color: 'var(--lc-text-3)' }}
-                    >
+                    <span key={tag} className="text-xs px-1.5 py-0.5 rounded hidden sm:inline"
+                      style={{ backgroundColor: 'var(--lc-surface-3)', color: 'var(--lc-text-3)' }}>
                       {tag}
                     </span>
                   ))}
@@ -322,10 +307,61 @@ function ProblemsPanel() {
         )}
       </div>
 
-      {visible.length > 0 && (
-        <p className="text-xs mt-3" style={{ color: 'var(--lc-text-3)' }}>
-          Showing {visible.length} of {problems.length} problems
-        </p>
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4">
+          <p className="text-xs" style={{ color: 'var(--lc-text-3)' }}>
+            {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total} problems
+          </p>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+              style={{
+                backgroundColor: 'var(--lc-surface-2)',
+                color: page === 1 ? 'var(--lc-muted)' : 'var(--lc-text-2)',
+                border: '1px solid var(--lc-border)',
+                cursor: page === 1 ? 'not-allowed' : 'pointer',
+              }}
+            >
+              ← Prev
+            </button>
+
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              const start = Math.max(1, Math.min(page - 2, totalPages - 4))
+              const pg = start + i
+              return (
+                <button
+                  key={pg}
+                  onClick={() => setPage(pg)}
+                  className="w-8 h-8 rounded-lg text-xs font-medium transition-all"
+                  style={{
+                    backgroundColor: pg === page ? 'var(--lc-orange)' : 'var(--lc-surface-2)',
+                    color: pg === page ? '#1a1a1a' : 'var(--lc-text-3)',
+                    border: `1px solid ${pg === page ? 'var(--lc-orange)' : 'var(--lc-border)'}`,
+                  }}
+                >
+                  {pg}
+                </button>
+              )
+            })}
+
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+              style={{
+                backgroundColor: 'var(--lc-surface-2)',
+                color: page === totalPages ? 'var(--lc-muted)' : 'var(--lc-text-2)',
+                border: '1px solid var(--lc-border)',
+                cursor: page === totalPages ? 'not-allowed' : 'pointer',
+              }}
+            >
+              Next →
+            </button>
+          </div>
+        </div>
       )}
     </div>
   )
