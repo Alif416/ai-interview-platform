@@ -257,13 +257,24 @@ function ProblemsPanel() {
         </div>
 
         {loading ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-16">
+          Array.from({ length: 8 }).map((_, i) => (
             <div
-              className="w-7 h-7 rounded-full border-2 border-t-transparent animate-spin"
-              style={{ borderColor: 'var(--lc-border)', borderTopColor: 'var(--lc-orange)' }}
-            />
-            <p className="text-xs" style={{ color: 'var(--lc-muted)' }}>Loading problems…</p>
-          </div>
+              key={i}
+              className="grid items-center px-5 py-3.5 border-b last:border-b-0"
+              style={{ gridTemplateColumns: '44px 1fr 100px auto', borderColor: 'var(--lc-border)' }}
+            >
+              <div className="w-5 h-3 rounded animate-pulse" style={{ backgroundColor: 'var(--lc-surface-3)' }} />
+              <div
+                className="h-3.5 rounded animate-pulse mr-4"
+                style={{ backgroundColor: 'var(--lc-surface-3)', width: `${[55, 40, 65, 48, 70, 44, 60, 52][i]}%` }}
+              />
+              <div className="w-14 h-5 rounded-full animate-pulse" style={{ backgroundColor: 'var(--lc-surface-3)' }} />
+              <div className="flex gap-1.5">
+                <div className="w-12 h-4 rounded animate-pulse hidden sm:block" style={{ backgroundColor: 'var(--lc-surface-3)' }} />
+                <div className="w-10 h-4 rounded animate-pulse hidden sm:block" style={{ backgroundColor: 'var(--lc-surface-3)' }} />
+              </div>
+            </div>
+          ))
         ) : problems.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-3">
             <svg className="w-10 h-10" style={{ color: 'var(--lc-border-2)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -372,14 +383,14 @@ function ProblemsPanel() {
 function LiveRoomsPanel({ navigate }) {
   const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [sessionId, setSessionId] = useState('')
   const [filter, setFilter] = useState('All')
 
   useEffect(() => {
-    fetch('http://localhost:3000/api/v1/sessions')
-      .then(r => r.json())
-      .then(j => { if (j.success) setSessions(j.data.sessions) })
-      .catch(() => {})
+    api.get('/sessions')
+      .then(res => { if (res.data.success) setSessions(res.data.data.sessions) })
+      .catch(() => setError('Failed to load sessions. Check your connection and try again.'))
       .finally(() => setLoading(false))
   }, [])
 
@@ -470,12 +481,37 @@ function LiveRoomsPanel({ navigate }) {
           ))}
         </div>
 
+        {error && (
+          <div
+            className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm mb-4"
+            style={{ backgroundColor: 'var(--lc-error-dim)', border: '1px solid rgba(255,55,95,0.3)', color: 'var(--lc-error)' }}
+          >
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            {error}
+          </div>
+        )}
+
         {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <div
-              className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin"
-              style={{ borderColor: 'var(--lc-border)', borderTopColor: 'var(--lc-orange)' }}
-            />
+          <div className="flex flex-col gap-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div
+                key={i}
+                className="rounded-xl border p-4 flex items-center gap-4"
+                style={{ backgroundColor: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}
+              >
+                <div className="w-2.5 h-2.5 rounded-full animate-pulse shrink-0" style={{ backgroundColor: 'var(--lc-surface-3)' }} />
+                <div className="flex-1 space-y-2">
+                  <div
+                    className="h-3.5 rounded animate-pulse"
+                    style={{ backgroundColor: 'var(--lc-surface-3)', width: `${[58, 44, 52][i]}%` }}
+                  />
+                  <div className="h-3 rounded animate-pulse" style={{ backgroundColor: 'var(--lc-surface-3)', width: '30%' }} />
+                </div>
+                <div className="w-20 h-8 rounded-lg animate-pulse shrink-0" style={{ backgroundColor: 'var(--lc-surface-3)' }} />
+              </div>
+            ))}
           </div>
         ) : visible.length === 0 ? (
           <div

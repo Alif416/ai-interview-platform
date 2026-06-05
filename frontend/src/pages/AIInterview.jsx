@@ -268,6 +268,47 @@ export default function AIInterview() {
 
   const lineCount = answer ? answer.split('\n').length : 0
 
+  /* ── Generating skeleton → keeps table structure visible while waiting ── */
+  if (generating) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="flex items-center justify-between mb-5">
+          <div className="space-y-2">
+            <div className="w-44 h-4 rounded animate-pulse" style={{ backgroundColor: 'var(--lc-surface-3)' }} />
+            <div className="w-64 h-3 rounded animate-pulse" style={{ backgroundColor: 'var(--lc-surface-3)' }} />
+          </div>
+        </div>
+        <div
+          className="rounded-xl border overflow-hidden"
+          style={{ backgroundColor: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}
+        >
+          <div
+            className="grid text-xs font-medium px-5 py-2.5 border-b"
+            style={{ gridTemplateColumns: '32px 1fr 90px', color: 'var(--lc-text-3)', borderColor: 'var(--lc-border)', backgroundColor: 'var(--lc-surface-2)' }}
+          >
+            <span>#</span>
+            <span>Question</span>
+            <span>Difficulty</span>
+          </div>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div
+              key={i}
+              className="grid items-center px-5 py-4 border-b last:border-b-0"
+              style={{ gridTemplateColumns: '32px 1fr 90px', borderColor: 'var(--lc-border)' }}
+            >
+              <div className="w-3 h-3 rounded animate-pulse" style={{ backgroundColor: 'var(--lc-surface-3)' }} />
+              <div
+                className="h-3.5 rounded animate-pulse mr-4"
+                style={{ backgroundColor: 'var(--lc-surface-3)', width: `${[72, 58, 80, 63, 68][i]}%` }}
+              />
+              <div className="w-14 h-5 rounded-full animate-pulse" style={{ backgroundColor: 'var(--lc-surface-3)' }} />
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   /* ── No questions yet → setup screen ──────────────────────────── */
   if (!questions.length) {
     return (
