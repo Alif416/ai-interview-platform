@@ -84,13 +84,33 @@ function ProblemsPanel() {
   const [error, setError] = useState(null)
   const [diffFilter, setDiffFilter] = useState('All')
   const [search, setSearch] = useState('')
+  const [syncing, setSyncing] = useState(false)
+  const [syncResult, setSyncResult] = useState(null)
 
-  useEffect(() => {
+  const loadProblems = () => {
+    setLoading(true)
+    setError(null)
     api.get('/problems')
       .then(res => setProblems(res.data.data))
       .catch(() => setError('Failed to load problems'))
       .finally(() => setLoading(false))
-  }, [])
+  }
+
+  useEffect(() => { loadProblems() }, [])
+
+  const syncNeetcode = async () => {
+    setSyncing(true)
+    setSyncResult(null)
+    try {
+      const { data } = await api.post('/problems/sync')
+      setSyncResult({ ok: true, message: data.message })
+      loadProblems()
+    } catch (e) {
+      setSyncResult({ ok: false, message: e.response?.data?.message || 'Sync failed' })
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   const visible = problems.filter(p => {
     const matchDiff = diffFilter === 'All' || p.difficulty === diffFilter
@@ -133,7 +153,7 @@ function ProblemsPanel() {
     <div>
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <h2 className="font-semibold text-base" style={{ color: 'var(--lc-text)' }}>Problem Set</h2>
           <span
             className="px-2 py-0.5 rounded-full text-xs"
@@ -141,6 +161,36 @@ function ProblemsPanel() {
           >
             {problems.length}
           </span>
+          <button
+            onClick={syncNeetcode}
+            disabled={syncing}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+            style={{
+              backgroundColor: syncing ? 'var(--lc-surface-3)' : 'var(--lc-orange-dim)',
+              color: syncing ? 'var(--lc-muted)' : 'var(--lc-orange)',
+              border: '1px solid rgba(255,161,22,0.3)',
+              cursor: syncing ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {syncing ? (
+              <>
+                <div className="w-3 h-3 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--lc-muted)', borderTopColor: 'var(--lc-orange)' }} />
+                Syncing NeetCode 250…
+              </>
+            ) : (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Sync NeetCode 250
+              </>
+            )}
+          </button>
+          {syncResult && (
+            <span className="text-xs" style={{ color: syncResult.ok ? 'var(--lc-easy)' : 'var(--lc-hard)' }}>
+              {syncResult.message}
+            </span>
+          )}
         </div>
         <div className="relative">
           <svg

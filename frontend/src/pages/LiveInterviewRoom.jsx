@@ -236,36 +236,35 @@ function ProblemPanel({ problem, user, onSelectProblem }) {
       {/* Tab content */}
       <div className="flex-1 overflow-y-auto px-4 py-4 min-h-0">
         {tab === 'description' && (
-          <div className="text-sm leading-relaxed" style={{ color: 'var(--lc-text-2)' }}>
-            {problem.description.split('\n').map((line, i) => {
-              // Render bold **text** and inline code `code`
-              const parts = line.split(/(`[^`]+`|\*\*[^*]+\*\*)/).map((part, j) => {
-                if (part.startsWith('`') && part.endsWith('`')) {
-                  return (
-                    <code
-                      key={j}
-                      className="px-1.5 py-0.5 rounded text-xs font-mono mx-0.5"
-                      style={{ backgroundColor: 'var(--lc-surface-3)', color: '#67e8f9' }}
-                    >
-                      {part.slice(1, -1)}
-                    </code>
-                  )
-                }
-                if (part.startsWith('**') && part.endsWith('**')) {
-                  return (
-                    <strong key={j} style={{ color: 'var(--lc-text)' }}>
-                      {part.slice(2, -2)}
-                    </strong>
-                  )
-                }
-                return part
+          <div className="text-sm leading-relaxed lc-problem-content" style={{ color: 'var(--lc-text-2)' }}>
+            {problem.description?.includes('<') ? (
+              <div dangerouslySetInnerHTML={{ __html: problem.description }} />
+            ) : (
+              problem.description?.split('\n').map((line, i) => {
+                const parts = line.split(/(`[^`]+`|\*\*[^*]+\*\*)/).map((part, j) => {
+                  if (part.startsWith('`') && part.endsWith('`')) {
+                    return (
+                      <code
+                        key={j}
+                        className="px-1.5 py-0.5 rounded text-xs font-mono mx-0.5"
+                        style={{ backgroundColor: 'var(--lc-surface-3)', color: '#67e8f9' }}
+                      >
+                        {part.slice(1, -1)}
+                      </code>
+                    )
+                  }
+                  if (part.startsWith('**') && part.endsWith('**')) {
+                    return <strong key={j} style={{ color: 'var(--lc-text)' }}>{part.slice(2, -2)}</strong>
+                  }
+                  return part
+                })
+                return line.startsWith('-') || line.match(/^\d\./) ? (
+                  <li key={i} className="ml-4 mb-1">{parts}</li>
+                ) : (
+                  <p key={i} className={line ? 'mb-3' : 'mb-1'}>{parts}</p>
+                )
               })
-              return line.startsWith('-') || line.match(/^\d\./) ? (
-                <li key={i} className="ml-4 mb-1">{parts}</li>
-              ) : (
-                <p key={i} className={line ? 'mb-3' : 'mb-1'}>{parts}</p>
-              )
-            })}
+            )}
           </div>
         )}
 

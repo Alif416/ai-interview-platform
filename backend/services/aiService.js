@@ -40,8 +40,8 @@ Return ONLY the JSON. No extra text.`
     ]
   })
 
-  const content = message.content[0].text
-  return JSON.parse(content)
+  const raw = message.content[0].text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
+  return JSON.parse(raw)
 }
 
 // Evaluate a candidate's answer
@@ -81,8 +81,8 @@ Return ONLY the JSON. No extra text.`
     ]
   })
 
-  const content = message.content[0].text
-  return JSON.parse(content)
+  const raw = message.content[0].text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
+  return JSON.parse(raw)
 }
 
 // Stream AI interviewer response (for real-time feel)

@@ -105,6 +105,7 @@ export default function AIInterview() {
   const [leftTab, setLeftTab]         = useState('description')
   const [rightTab, setRightTab]       = useState('answer')
   const [editorLanguage, setEditorLanguage] = useState('javascript')
+  const [revealedHints, setRevealedHints] = useState([])
 
   // Chat state
   const [chatMessages, setChatMessages] = useState([])
@@ -152,6 +153,7 @@ export default function AIInterview() {
     setEditorLanguage('javascript')
     setChatMessages([])
     setChatInput('')
+    setRevealedHints([])
   }
 
   const submitAnswer = async () => {
@@ -554,21 +556,39 @@ export default function AIInterview() {
 
               {leftTab === 'hints' && (
                 <div>
-                  <p className="text-xs font-medium mb-3" style={{ color: 'var(--lc-text-2)' }}>
+                  <p className="text-xs font-medium mb-1" style={{ color: 'var(--lc-text-2)' }}>
                     Key points to cover in your answer:
                   </p>
+                  <p className="text-xs mb-4" style={{ color: 'var(--lc-muted)' }}>
+                    Click a hint to reveal it — try to solve it yourself first!
+                  </p>
                   <ul className="space-y-2">
-                    {selected.keyPoints.map((pt, i) => (
-                      <li key={i} className="flex items-start gap-2.5">
-                        <span
-                          className="shrink-0 mt-0.5 w-4 h-4 rounded-full flex items-center justify-center text-xs font-bold"
-                          style={{ backgroundColor: 'var(--lc-orange-dim)', color: 'var(--lc-orange)' }}
+                    {selected.keyPoints.map((pt, i) => {
+                      const revealed = revealedHints.includes(i)
+                      return (
+                        <li
+                          key={i}
+                          onClick={() => setRevealedHints(prev => revealed ? prev.filter(x => x !== i) : [...prev, i])}
+                          className="flex items-start gap-2.5 rounded-lg p-2.5 cursor-pointer transition-colors"
+                          style={{
+                            backgroundColor: revealed ? 'var(--lc-surface-2)' : 'var(--lc-surface-3)',
+                            border: `1px solid ${revealed ? 'var(--lc-orange)' : 'var(--lc-border)'}`,
+                          }}
                         >
-                          {i + 1}
-                        </span>
-                        <span className="text-xs leading-relaxed" style={{ color: 'var(--lc-text-2)' }}>{pt}</span>
-                      </li>
-                    ))}
+                          <span
+                            className="shrink-0 mt-0.5 w-4 h-4 rounded-full flex items-center justify-center text-xs font-bold"
+                            style={{ backgroundColor: 'var(--lc-orange-dim)', color: 'var(--lc-orange)' }}
+                          >
+                            {i + 1}
+                          </span>
+                          {revealed ? (
+                            <span className="text-xs leading-relaxed" style={{ color: 'var(--lc-text-2)' }}>{pt}</span>
+                          ) : (
+                            <span className="text-xs italic" style={{ color: 'var(--lc-muted)' }}>Click to reveal hint {i + 1}</span>
+                          )}
+                        </li>
+                      )
+                    })}
                   </ul>
                 </div>
               )}

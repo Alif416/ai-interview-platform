@@ -1,7 +1,65 @@
 const vm = require('vm')
+const axios = require('axios')
 const ApiResponse = require('../utils/apiResponse')
 const asyncHandler = require('../middleware/asyncHandler')
 const { prisma } = require('../config/database')
+const NEETCODE_SLUGS = require('../data/neetcode250Slugs')
+
+const LEETCODE_GRAPHQL = 'https://leetcode.com/graphql'
+const PROBLEM_QUERY = `
+  query questionData($titleSlug: String!) {
+    question(titleSlug: $titleSlug) {
+      title
+      titleSlug
+      content
+      difficulty
+      topicTags { name }
+      exampleTestcases
+      codeSnippets { langSlug code }
+    }
+  }
+`
+
+async function fetchFromLeetCode(slug) {
+  const { data } = await axios.post(
+    LEETCODE_GRAPHQL,
+    { query: PROBLEM_QUERY, variables: { titleSlug: slug } },
+    {
+      headers: {
+        'Content-Type': 'application/json',
+        'Referer': 'https://leetcode.com',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
+      timeout: 15000,
+    }
+  )
+  return data.data?.question ?? null
+}
+
+function transformQuestion(q) {
+  if (!q || !q.content) return null // premium or unavailable
+
+  const difficulty = q.difficulty?.toUpperCase()
+  const jsCode = q.codeSnippets?.find(s => s.langSlug === 'javascript')?.code ?? ''
+  const pyCode = q.codeSnippets?.find(s => s.langSlug === 'python3')?.code ?? ''
+
+  const exampleLines = (q.exampleTestcases ?? '').split('\n').filter(Boolean)
+  const examples = exampleLines.length
+    ? [{ input: exampleLines[0], output: '', explanation: '' }]
+    : []
+
+  return {
+    title: q.title,
+    slug: q.titleSlug,
+    difficulty: ['EASY', 'MEDIUM', 'HARD'].includes(difficulty) ? difficulty : 'MEDIUM',
+    description: q.content,
+    examples,
+    constraints: [],
+    testCases: [],
+    starterCode: { javascript: jsCode, python: pyCode },
+    tags: q.topicTags?.map(t => t.name) ?? [],
+  }
+}
 
 // GET /api/v1/problems
 const getAllProblems = asyncHandler(async (req, res) => {
@@ -106,4 +164,44 @@ const runCode = asyncHandler(async (req, res) => {
   )
 })
 
-module.exports = { getAllProblems, getProblemById, runCode }
+// POST /api/v1/problems/sync  — fetch all NeetCode 250 from LeetCode and cache in DB
+const syncProblems = asyncHandler(async (req, res) => {
+  const synced = []
+  const skipped = []
+  const errors = []
+
+  for (let i = 0; i < NEETCODE_SLUGS.length; i++) {
+    const slug = NEETCODE_SLUGS[i]
+    try {
+      const question = await fetchFromLeetCode(slug)
+      const problem = transformQuestion(question)
+
+      if (!problem) {
+        skipped.push(slug)
+        continue
+      }
+
+      await prisma.problem.upsert({
+        where: { slug: problem.slug },
+        update: problem,
+        create: problem,
+      })
+      synced.push(problem.title)
+    } catch (e) {
+      errors.push({ slug, error: e.message })
+    }
+
+    // Small delay between requests to avoid rate-limiting
+    if (i < NEETCODE_SLUGS.length - 1) {
+      await new Promise(r => setTimeout(r, 300))
+    }
+  }
+
+  ApiResponse.success(
+    res,
+    { synced: synced.length, skipped: skipped.length, errors },
+    `Synced ${synced.length} problems, skipped ${skipped.length} (premium/unavailable)`
+  )
+})
+
+module.exports = { getAllProblems, getProblemById, runCode, syncProblems }
