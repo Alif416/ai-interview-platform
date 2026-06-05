@@ -6,19 +6,20 @@ const asyncHandler = require('../middleware/asyncHandler')
 
 // POST /api/v1/auth/register
 const register = asyncHandler(async (req, res) => {
-  // No manual validation needed — Zod handled it already
-  const { name, email, password, role } = req.body
+  const { name, username, email, password, role } = req.body
 
-  const existingUser = await prisma.user.findUnique({ where: { email } })
-  if (existingUser) {
-    return ApiResponse.badRequest(res, 'Email already registered')
-  }
+  const [existingEmail, existingUsername] = await Promise.all([
+    prisma.user.findUnique({ where: { email } }),
+    prisma.user.findUnique({ where: { username } }),
+  ])
+  if (existingEmail) return ApiResponse.badRequest(res, 'Email already registered')
+  if (existingUsername) return ApiResponse.badRequest(res, 'Username already taken')
 
   const hashedPassword = await bcrypt.hash(password, 12)
 
   const user = await prisma.user.create({
-    data: { name, email, password: hashedPassword, role },
-    select: { id: true, name: true, email: true, role: true, createdAt: true }
+    data: { name, username, email, password: hashedPassword, role },
+    select: { id: true, name: true, username: true, email: true, role: true, createdAt: true }
   })
 
   const token = generateToken({ userId: user.id, role: user.role })
@@ -30,7 +31,10 @@ const register = asyncHandler(async (req, res) => {
 const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body
 
-  const user = await prisma.user.findUnique({ where: { email } })
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true, email: true, username: true, name: true, password: true, role: true, createdAt: true }
+  })
 
   if (!user) {
     return ApiResponse.unauthorized(res, 'Invalid email or password')

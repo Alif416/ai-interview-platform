@@ -380,112 +380,283 @@ function ProblemsPanel() {
 
 // ─── Live Rooms Panel ─────────────────────────────────────────────────────────
 
-function LiveRoomsPanel({ navigate }) {
+const BLANK_FORM = { title: '', candidateUsername: '', role: '', level: 'L4', scheduledAt: '' }
+
+function SessionCard({ session, navigate, isInterviewer }) {
+  const s = STATUS_CFG[session.status] || STATUS_CFG.SCHEDULED
+  const isLive = session.status === 'IN_PROGRESS'
+  const person = isInterviewer ? session.candidate : session.interviewer
+  const personLabel = isInterviewer ? 'Candidate' : 'Interviewer'
+
+  return (
+    <div
+      className="rounded-xl border p-4 flex items-center gap-4 transition-all"
+      style={{
+        backgroundColor: 'var(--lc-surface)',
+        borderColor: isLive ? 'rgba(255,192,30,0.3)' : 'var(--lc-border)',
+        boxShadow: isLive ? '0 0 0 1px rgba(255,192,30,0.1)' : 'none',
+      }}
+      onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--lc-surface-2)'}
+      onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--lc-surface)'}
+    >
+      <span className="relative flex w-2.5 h-2.5 shrink-0">
+        {s.pulse && (
+          <span className="absolute inline-flex h-full w-full rounded-full opacity-60 animate-ping" style={{ backgroundColor: s.dot }} />
+        )}
+        <span className="relative w-2.5 h-2.5 rounded-full" style={{ backgroundColor: s.dot }} />
+      </span>
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-0.5">
+          <span className="text-sm font-medium truncate" style={{ color: 'var(--lc-text)' }}>{session.title}</span>
+          <span className={`lc-badge ${s.cls} shrink-0`}>{s.label}</span>
+        </div>
+        <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--lc-text-3)' }}>
+          <span>{session.role}</span>
+          <span className="px-1.5 py-0.5 rounded font-mono" style={{ backgroundColor: 'var(--lc-surface-3)', color: 'var(--lc-orange)' }}>
+            {session.level}
+          </span>
+          {person && (
+            <span className="flex items-center gap-1">
+              <span className="w-4 h-4 rounded-full flex items-center justify-center text-xs font-bold"
+                style={{ backgroundColor: 'rgba(255,161,22,0.15)', color: 'var(--lc-orange)' }}>
+                {person.name?.charAt(0)?.toUpperCase() || '?'}
+              </span>
+              <span>{personLabel}: </span>
+              <span style={{ color: 'var(--lc-text-2)' }}>{person.name}</span>
+              <span style={{ color: 'var(--lc-muted)' }}>@{person.username}</span>
+            </span>
+          )}
+        </div>
+      </div>
+
+      <button
+        onClick={() => navigate(`/room/${session.id}`)}
+        className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all"
+        style={{
+          backgroundColor: isLive ? '#ffc01e' : 'var(--lc-orange-dim)',
+          color: isLive ? '#1a1a1a' : 'var(--lc-orange)',
+          border: isLive ? 'none' : '1px solid rgba(255,161,22,0.3)',
+        }}
+        onMouseEnter={e => !isLive && (e.currentTarget.style.backgroundColor = 'rgba(255,161,22,0.25)')}
+        onMouseLeave={e => !isLive && (e.currentTarget.style.backgroundColor = 'var(--lc-orange-dim)')}
+      >
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.069A1 1 0 0121 8.882V15.118a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+        </svg>
+        {isLive ? 'Join Live' : 'Join Room'}
+      </button>
+    </div>
+  )
+}
+
+function LiveRoomsPanel({ navigate, userRole }) {
   const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [sessionId, setSessionId] = useState('')
   const [filter, setFilter] = useState('All')
 
-  useEffect(() => {
+  // Create session form (interviewer only)
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState(BLANK_FORM)
+  const [formError, setFormError] = useState('')
+  const [creating, setCreating] = useState(false)
+
+  const isInterviewer = userRole === 'INTERVIEWER' || userRole === 'ADMIN'
+
+  const loadSessions = () => {
+    setLoading(true)
     api.get('/sessions')
       .then(res => { if (res.data.success) setSessions(res.data.data.sessions) })
       .catch(() => setError('Failed to load sessions. Check your connection and try again.'))
       .finally(() => setLoading(false))
-  }, [])
+  }
+
+  useEffect(() => { loadSessions() }, [])
 
   const FILTERS = ['All', 'IN_PROGRESS', 'SCHEDULED']
-  const FILTER_LABELS = { All: 'All Sessions', IN_PROGRESS: 'Live Now', SCHEDULED: 'Upcoming' }
+  const FILTER_LABELS = { All: 'All', IN_PROGRESS: 'Live Now', SCHEDULED: 'Upcoming' }
 
   const visible = sessions.filter(s => filter === 'All' || s.status === filter)
   const liveCount = sessions.filter(s => s.status === 'IN_PROGRESS').length
+
+  const handleCreate = async (e) => {
+    e.preventDefault()
+    setFormError('')
+    setCreating(true)
+    try {
+      await api.post('/sessions', {
+        title: form.title,
+        candidateUsername: form.candidateUsername.toLowerCase(),
+        role: form.role,
+        level: form.level,
+        scheduledAt: new Date(form.scheduledAt).toISOString(),
+      })
+      setForm(BLANK_FORM)
+      setShowForm(false)
+      loadSessions()
+    } catch (err) {
+      setFormError(err.response?.data?.message || 'Failed to create session')
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const LEVELS = ['L3', 'L4', 'L5', 'L6', 'L7']
 
   return (
     <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="font-semibold text-base" style={{ color: 'var(--lc-text)' }}>Live Interview Rooms</h2>
+          <h2 className="font-semibold text-base" style={{ color: 'var(--lc-text)' }}>
+            {isInterviewer ? 'Live Interview Rooms' : 'Interview Invitations'}
+          </h2>
           <p className="text-xs mt-1" style={{ color: 'var(--lc-text-3)' }}>
-            Join a session to collaborate with shared code editor and real-time chat.
+            {isInterviewer
+              ? 'Create sessions and invite candidates by their username.'
+              : 'Sessions you have been invited to appear here.'}
           </p>
         </div>
-        {liveCount > 0 && (
-          <div
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
-            style={{ backgroundColor: 'rgba(255,192,30,0.12)', color: '#ffc01e', border: '1px solid rgba(255,192,30,0.3)' }}
-          >
-            <span className="relative flex w-1.5 h-1.5">
-              <span className="absolute inline-flex h-full w-full rounded-full opacity-75 animate-ping" style={{ backgroundColor: '#ffc01e' }} />
-              <span className="relative w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#ffc01e' }} />
-            </span>
-            {liveCount} Live
-          </div>
-        )}
-      </div>
-
-      {/* Quick join by ID */}
-      <div
-        className="rounded-xl border p-4 flex flex-col gap-3"
-        style={{ backgroundColor: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}
-      >
-        <p className="text-xs font-medium" style={{ color: 'var(--lc-text-2)' }}>Quick Join by Session ID</p>
-        <div className="flex gap-2">
-          <input
-            type="number"
-            value={sessionId}
-            onChange={e => setSessionId(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && sessionId && navigate(`/room/${sessionId}`)}
-            placeholder="Enter session ID…"
-            className="lc-input flex-1"
-            style={{ padding: '7px 12px' }}
-            min="1"
-          />
-          <button
-            onClick={() => sessionId && navigate(`/room/${sessionId}`)}
-            disabled={!sessionId}
-            className="px-4 py-2 rounded-lg text-sm font-medium transition-all"
-            style={{
-              backgroundColor: sessionId ? 'var(--lc-orange)' : 'var(--lc-surface-3)',
-              color: sessionId ? '#1a1a1a' : 'var(--lc-muted)',
-              cursor: sessionId ? 'pointer' : 'not-allowed',
-            }}
-          >
-            Join
-          </button>
+        <div className="flex items-center gap-3">
+          {liveCount > 0 && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
+              style={{ backgroundColor: 'rgba(255,192,30,0.12)', color: '#ffc01e', border: '1px solid rgba(255,192,30,0.3)' }}>
+              <span className="relative flex w-1.5 h-1.5">
+                <span className="absolute inline-flex h-full w-full rounded-full opacity-75 animate-ping" style={{ backgroundColor: '#ffc01e' }} />
+                <span className="relative w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#ffc01e' }} />
+              </span>
+              {liveCount} Live
+            </div>
+          )}
+          {isInterviewer && (
+            <button
+              onClick={() => { setShowForm(v => !v); setFormError('') }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+              style={{
+                backgroundColor: showForm ? 'var(--lc-orange)' : 'var(--lc-orange-dim)',
+                color: showForm ? '#1a1a1a' : 'var(--lc-orange)',
+                border: '1px solid rgba(255,161,22,0.3)',
+              }}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showForm ? 'M6 18L18 6M6 6l12 12' : 'M12 4v16m8-8H4'} />
+              </svg>
+              {showForm ? 'Cancel' : 'New Session'}
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Create session form (interviewer only) */}
+      {isInterviewer && showForm && (
+        <div className="rounded-xl border p-5 flex flex-col gap-4"
+          style={{ backgroundColor: 'var(--lc-surface)', borderColor: 'rgba(255,161,22,0.3)' }}>
+          <p className="text-xs font-semibold" style={{ color: 'var(--lc-text-2)' }}>Create Interview Session</p>
+          {formError && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs"
+              style={{ backgroundColor: 'var(--lc-error-dim)', border: '1px solid rgba(255,55,95,0.3)', color: 'var(--lc-error)' }}>
+              <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              {formError}
+            </div>
+          )}
+          <form onSubmit={handleCreate} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--lc-text-3)' }}>Session Title</label>
+              <input
+                required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })}
+                placeholder="e.g. Frontend Engineer Interview"
+                className="lc-input w-full" style={{ padding: '7px 12px' }}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--lc-text-3)' }}>Candidate Username</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium select-none" style={{ color: 'var(--lc-muted)' }}>@</span>
+                <input
+                  required value={form.candidateUsername}
+                  onChange={e => setForm({ ...form, candidateUsername: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') })}
+                  placeholder="john_doe"
+                  className="lc-input w-full" style={{ padding: '7px 12px 7px 24px' }}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--lc-text-3)' }}>Role / Position</label>
+              <input
+                required value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}
+                placeholder="e.g. Frontend Engineer"
+                className="lc-input w-full" style={{ padding: '7px 12px' }}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--lc-text-3)' }}>Level</label>
+              <div className="flex gap-1.5 flex-wrap">
+                {LEVELS.map(l => (
+                  <button key={l} type="button" onClick={() => setForm({ ...form, level: l })}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium border transition-all"
+                    style={{
+                      backgroundColor: form.level === l ? 'var(--lc-orange-dim)' : 'transparent',
+                      borderColor: form.level === l ? 'var(--lc-orange)' : 'var(--lc-border)',
+                      color: form.level === l ? 'var(--lc-orange)' : 'var(--lc-text-3)',
+                    }}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--lc-text-3)' }}>Scheduled Date & Time</label>
+              <input
+                required type="datetime-local" value={form.scheduledAt}
+                onChange={e => setForm({ ...form, scheduledAt: e.target.value })}
+                className="lc-input w-full" style={{ padding: '7px 12px', colorScheme: 'dark' }}
+              />
+            </div>
+            <div className="sm:col-span-2 flex justify-end">
+              <button
+                type="submit" disabled={creating}
+                className="flex items-center gap-2 px-5 py-2 rounded-lg text-xs font-semibold transition-all"
+                style={{
+                  backgroundColor: creating ? 'var(--lc-surface-3)' : 'var(--lc-orange)',
+                  color: creating ? 'var(--lc-muted)' : '#1a1a1a',
+                  cursor: creating ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {creating && <div className="w-3 h-3 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--lc-muted)', borderTopColor: '#1a1a1a' }} />}
+                {creating ? 'Creating…' : 'Create & Invite'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* Session list */}
       <div>
-        {/* Filter pills */}
-        <div className="flex items-center gap-1.5 mb-4">
-          {FILTERS.map(f => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className="px-3 py-1 rounded-full text-xs font-medium border transition-all"
-              style={{
-                backgroundColor: filter === f ? 'var(--lc-orange-dim)' : 'transparent',
-                borderColor: filter === f ? 'var(--lc-orange)' : 'var(--lc-border)',
-                color: filter === f ? 'var(--lc-orange)' : 'var(--lc-text-3)',
-              }}
-            >
-              {FILTER_LABELS[f]}
-              {f !== 'All' && (
-                <span className="ml-1 opacity-60">
-                  {sessions.filter(s => s.status === f).length}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
+        {isInterviewer && (
+          <div className="flex items-center gap-1.5 mb-4">
+            {FILTERS.map(f => (
+              <button key={f} onClick={() => setFilter(f)}
+                className="px-3 py-1 rounded-full text-xs font-medium border transition-all"
+                style={{
+                  backgroundColor: filter === f ? 'var(--lc-orange-dim)' : 'transparent',
+                  borderColor: filter === f ? 'var(--lc-orange)' : 'var(--lc-border)',
+                  color: filter === f ? 'var(--lc-orange)' : 'var(--lc-text-3)',
+                }}>
+                {FILTER_LABELS[f]}
+                {f !== 'All' && (
+                  <span className="ml-1 opacity-60">{sessions.filter(s => s.status === f).length}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
 
         {error && (
-          <div
-            className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm mb-4"
-            style={{ backgroundColor: 'var(--lc-error-dim)', border: '1px solid rgba(255,55,95,0.3)', color: 'var(--lc-error)' }}
-          >
+          <div className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm mb-4"
+            style={{ backgroundColor: 'var(--lc-error-dim)', border: '1px solid rgba(255,55,95,0.3)', color: 'var(--lc-error)' }}>
             <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
@@ -496,17 +667,11 @@ function LiveRoomsPanel({ navigate }) {
         {loading ? (
           <div className="flex flex-col gap-3">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div
-                key={i}
-                className="rounded-xl border p-4 flex items-center gap-4"
-                style={{ backgroundColor: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}
-              >
+              <div key={i} className="rounded-xl border p-4 flex items-center gap-4"
+                style={{ backgroundColor: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}>
                 <div className="w-2.5 h-2.5 rounded-full animate-pulse shrink-0" style={{ backgroundColor: 'var(--lc-surface-3)' }} />
                 <div className="flex-1 space-y-2">
-                  <div
-                    className="h-3.5 rounded animate-pulse"
-                    style={{ backgroundColor: 'var(--lc-surface-3)', width: `${[58, 44, 52][i]}%` }}
-                  />
+                  <div className="h-3.5 rounded animate-pulse" style={{ backgroundColor: 'var(--lc-surface-3)', width: `${[58, 44, 52][i]}%` }} />
                   <div className="h-3 rounded animate-pulse" style={{ backgroundColor: 'var(--lc-surface-3)', width: '30%' }} />
                 </div>
                 <div className="w-20 h-8 rounded-lg animate-pulse shrink-0" style={{ backgroundColor: 'var(--lc-surface-3)' }} />
@@ -514,91 +679,40 @@ function LiveRoomsPanel({ navigate }) {
             ))}
           </div>
         ) : visible.length === 0 ? (
-          <div
-            className="rounded-xl border p-10 flex flex-col items-center gap-3"
-            style={{ backgroundColor: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}
-          >
-            <svg className="w-10 h-10" style={{ color: 'var(--lc-border-2)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.069A1 1 0 0121 8.882V15.118a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-            <p className="text-sm" style={{ color: 'var(--lc-muted)' }}>No sessions available</p>
+          <div className="rounded-xl border p-12 flex flex-col items-center gap-4"
+            style={{ backgroundColor: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}>
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
+              style={{ backgroundColor: 'var(--lc-surface-3)', border: '1px solid var(--lc-border)' }}>
+              <svg className="w-7 h-7" style={{ color: 'var(--lc-muted)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-medium" style={{ color: 'var(--lc-text-2)' }}>
+                {isInterviewer ? 'No sessions yet' : 'No interview invitation yet'}
+              </p>
+              <p className="text-xs mt-1" style={{ color: 'var(--lc-muted)' }}>
+                {isInterviewer
+                  ? 'Create a session and invite a candidate to get started.'
+                  : 'When an interviewer invites you, your session will appear here.'}
+              </p>
+            </div>
+            {isInterviewer && (
+              <button onClick={() => setShowForm(true)}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium"
+                style={{ backgroundColor: 'var(--lc-orange-dim)', color: 'var(--lc-orange)', border: '1px solid rgba(255,161,22,0.3)' }}>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Create Session
+              </button>
+            )}
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            {visible.map(session => {
-              const s = STATUS_CFG[session.status] || STATUS_CFG.SCHEDULED
-              const isLive = session.status === 'IN_PROGRESS'
-              return (
-                <div
-                  key={session.id}
-                  className="rounded-xl border p-4 flex items-center gap-4 transition-all"
-                  style={{
-                    backgroundColor: 'var(--lc-surface)',
-                    borderColor: isLive ? 'rgba(255,192,30,0.3)' : 'var(--lc-border)',
-                    boxShadow: isLive ? '0 0 0 1px rgba(255,192,30,0.1)' : 'none',
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--lc-surface-2)'}
-                  onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--lc-surface)'}
-                >
-                  {/* Status dot */}
-                  <span className="relative flex w-2.5 h-2.5 shrink-0">
-                    {s.pulse && (
-                      <span
-                        className="absolute inline-flex h-full w-full rounded-full opacity-60 animate-ping"
-                        style={{ backgroundColor: s.dot }}
-                      />
-                    )}
-                    <span className="relative w-2.5 h-2.5 rounded-full" style={{ backgroundColor: s.dot }} />
-                  </span>
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className="text-sm font-medium truncate" style={{ color: 'var(--lc-text)' }}>
-                        {session.title}
-                      </span>
-                      <span className={`lc-badge ${s.cls} shrink-0`}>{s.label}</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--lc-text-3)' }}>
-                      <span>{session.role}</span>
-                      <span
-                        className="px-1.5 py-0.5 rounded font-mono"
-                        style={{ backgroundColor: 'var(--lc-surface-3)', color: 'var(--lc-orange)' }}
-                      >
-                        {session.level}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <span
-                          className="w-4 h-4 rounded-full flex items-center justify-center text-xs font-bold"
-                          style={{ backgroundColor: 'rgba(255,161,22,0.15)', color: 'var(--lc-orange)' }}
-                        >
-                          {session.candidate?.name?.charAt(0)?.toUpperCase() || '?'}
-                        </span>
-                        {session.candidate?.name}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Join button */}
-                  <button
-                    onClick={() => navigate(`/room/${session.id}`)}
-                    className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all"
-                    style={{
-                      backgroundColor: isLive ? '#ffc01e' : 'var(--lc-orange-dim)',
-                      color: isLive ? '#1a1a1a' : 'var(--lc-orange)',
-                      border: isLive ? 'none' : '1px solid rgba(255,161,22,0.3)',
-                    }}
-                    onMouseEnter={e => !isLive && (e.currentTarget.style.backgroundColor = 'rgba(255,161,22,0.25)')}
-                    onMouseLeave={e => !isLive && (e.currentTarget.style.backgroundColor = 'var(--lc-orange-dim)')}
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.069A1 1 0 0121 8.882V15.118a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                    {isLive ? 'Join Live' : 'Join Room'}
-                  </button>
-                </div>
-              )
-            })}
+            {visible.map(session => (
+              <SessionCard key={session.id} session={session} navigate={navigate} isInterviewer={isInterviewer} />
+            ))}
           </div>
         )}
       </div>
@@ -694,7 +808,7 @@ export default function Dashboard() {
       {/* ── Content ──────────────────────────────────────────────── */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6">
         {activeTab === 'problems'     && <ProblemsPanel />}
-        {activeTab === 'live'         && <LiveRoomsPanel navigate={navigate} />}
+        {activeTab === 'live'         && <LiveRoomsPanel navigate={navigate} userRole={user?.role} />}
         {activeTab === 'ai'           && <AIInterview />}
         {activeTab === 'performance'  && <PerformanceChart />}
       </main>

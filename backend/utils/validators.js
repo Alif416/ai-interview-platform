@@ -7,6 +7,12 @@ const registerSchema = z.object({
     .max(50, 'Name must be less than 50 characters')
     .trim(),
 
+  username: z.string()
+    .min(3, 'Username must be at least 3 characters')
+    .max(30, 'Username must be less than 30 characters')
+    .regex(/^[a-z0-9_]+$/, 'Username can only contain lowercase letters, numbers, and underscores')
+    .toLowerCase(),
+
   email: z.string()
     .email('Please provide a valid email')
     .toLowerCase(),
@@ -47,13 +53,9 @@ const createSessionSchema = z.object({
   scheduledAt: z.string()
     .datetime('scheduledAt must be a valid ISO datetime'),
 
-  interviewerId: z.number()
-    .int('interviewerId must be an integer')
-    .positive('interviewerId must be positive'),
-
-  candidateId: z.number()
-    .int('candidateId must be an integer')
-    .positive('candidateId must be positive')
+  candidateUsername: z.string()
+    .min(3, 'candidateUsername must be at least 3 characters')
+    .toLowerCase()
 })
 
 const updateSessionSchema = z.object({

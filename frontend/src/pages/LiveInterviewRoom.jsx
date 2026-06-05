@@ -603,6 +603,7 @@ export default function LiveInterviewRoom() {
   // Connection
   const [connected, setConnected] = useState(false)
   const [yjsConnected, setYjsConnected] = useState(false)
+  const [roomError, setRoomError] = useState(null)
 
   // Room state
   const [participants, setParticipants] = useState([])
@@ -720,6 +721,10 @@ export default function LiveInterviewRoom() {
     })
     s.on('connect_error', err => console.error('Socket error:', err.message))
     s.on('disconnect', () => setConnected(false))
+    s.on('room-error', ({ message }) => {
+      s.disconnect()
+      setRoomError(message)
+    })
 
     s.on('room-state', ({ participants, language: lang, messages, selectedProblem }) => {
       setParticipants(participants)
@@ -912,6 +917,22 @@ export default function LiveInterviewRoom() {
   const canSelectProblem = user?.role === 'INTERVIEWER' || user?.role === 'ADMIN'
 
   // ── Render ──────────────────────────────────────────────────────────────
+  if (roomError) {
+    return (
+      <div className="h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--lc-bg)' }}>
+        <div className="flex flex-col items-center gap-4 text-center max-w-sm px-6">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ backgroundColor: 'var(--lc-error-dim)', border: '1px solid rgba(255,55,95,0.3)' }}>
+            <svg className="w-7 h-7" style={{ color: '#ff375f' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+            </svg>
+          </div>
+          <p className="text-sm font-semibold" style={{ color: 'var(--lc-text)' }}>{roomError}</p>
+          <button onClick={() => navigate('/dashboard')} className="lc-btn-primary text-xs">Back to Dashboard</button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="h-screen flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--lc-bg)' }}>
       <style>{`

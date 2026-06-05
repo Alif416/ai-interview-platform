@@ -36,7 +36,7 @@ const ROLES = [
 ]
 
 export default function Register() {
-  const [formData, setFormData] = useState({ name: '', email: '', password: '', role: 'CANDIDATE' })
+  const [formData, setFormData] = useState({ name: '', username: '', email: '', password: '', role: 'CANDIDATE' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const { register } = useAuth()
@@ -49,7 +49,7 @@ export default function Register() {
     setError('')
     setLoading(true)
     try {
-      await register(formData.name, formData.email, formData.password, formData.role)
+      await register(formData.name, formData.username, formData.email, formData.password, formData.role)
       navigate('/dashboard')
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed. Please try again.')
@@ -116,6 +116,27 @@ export default function Register() {
                   onChange={handleChange} placeholder="John Doe" required
                   className="lc-input"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--lc-text-2)' }}>
+                  Username
+                </label>
+                <div className="relative">
+                  <span
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium select-none"
+                    style={{ color: 'var(--lc-muted)' }}
+                  >@</span>
+                  <input
+                    type="text" name="username" value={formData.username}
+                    onChange={e => setFormData({ ...formData, username: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') })}
+                    placeholder="john_doe" required
+                    className="lc-input"
+                    style={{ paddingLeft: '24px' }}
+                    minLength={3} maxLength={30}
+                  />
+                </div>
+                <p className="text-xs mt-1" style={{ color: 'var(--lc-muted)' }}>Lowercase letters, numbers, underscores only</p>
               </div>
 
               <div>

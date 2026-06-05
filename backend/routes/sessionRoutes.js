@@ -15,14 +15,14 @@ const {
   sessionQuerySchema
 } = require('../utils/validators')
 
-// Public
+// All session routes require authentication
+router.use(authenticate)
+
 router.get('/', validate(sessionQuerySchema, 'query'), getAllSessions)
 router.get('/:id', getSessionById)
 
-// Protected
 router.post(
   '/',
-  authenticate,
   authorize('INTERVIEWER', 'ADMIN'),
   validate(createSessionSchema),
   createSession
@@ -30,7 +30,6 @@ router.post(
 
 router.put(
   '/:id',
-  authenticate,
   authorize('INTERVIEWER', 'ADMIN'),
   validate(updateSessionSchema),
   updateSession
@@ -38,7 +37,6 @@ router.put(
 
 router.delete(
   '/:id',
-  authenticate,
   authorize('ADMIN'),
   deleteSession
 )

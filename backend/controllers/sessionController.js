@@ -2,13 +2,30 @@ const ApiResponse = require('../utils/apiResponse')
 const asyncHandler = require('../middleware/asyncHandler')
 const { prisma } = require('../config/database')
 
-// GET /api/v1/sessions?page=1&limit=20&status=SCHEDULED&role=engineer
+const SESSION_SELECT = {
+  id: true, title: true, role: true, level: true,
+  status: true, scheduledAt: true, createdAt: true,
+  interviewer: { select: { id: true, name: true, username: true, email: true } },
+  candidate:   { select: { id: true, name: true, username: true, email: true } },
+}
+
+// GET /api/v1/sessions
+// Interviewers/Admins see sessions they created.
+// Candidates see only sessions they were invited to.
 const getAllSessions = asyncHandler(async (req, res) => {
   const { status, role } = req.query
   const page  = Math.max(1, parseInt(req.query.page)  || 1)
   const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20))
 
+  const userFilter =
+    req.user.role === 'CANDIDATE'
+      ? { candidateId: req.user.id }
+      : req.user.role === 'INTERVIEWER'
+        ? { interviewerId: req.user.id }
+        : {} // ADMIN sees all
+
   const where = {
+    ...userFilter,
     ...(status && { status: status.toUpperCase() }),
     ...(role && { role: { contains: role, mode: 'insensitive' } }),
   }
@@ -17,12 +34,7 @@ const getAllSessions = asyncHandler(async (req, res) => {
     prisma.interviewSession.count({ where }),
     prisma.interviewSession.findMany({
       where,
-      select: {
-        id: true, title: true, role: true, level: true,
-        status: true, scheduledAt: true, createdAt: true,
-        interviewer: { select: { id: true, name: true, email: true } },
-        candidate:   { select: { id: true, name: true, email: true } },
-      },
+      select: SESSION_SELECT,
       orderBy: { scheduledAt: 'asc' },
       skip: (page - 1) * limit,
       take: limit,
@@ -48,44 +60,43 @@ const getSessionById = asyncHandler(async (req, res) => {
 
   const session = await prisma.interviewSession.findUnique({
     where: { id },
-    include: {
-      interviewer: { select: { id: true, name: true, email: true } },
-      candidate: { select: { id: true, name: true, email: true } }
-    }
+    select: SESSION_SELECT,
   })
 
   if (!session) {
     return ApiResponse.notFound(res, `Session with id ${id} not found`)
   }
 
+  // Only the interviewer, the candidate, or an admin can view it
+  const isAllowed =
+    req.user.role === 'ADMIN' ||
+    session.interviewer.id === req.user.id ||
+    session.candidate.id  === req.user.id
+
+  if (!isAllowed) {
+    return ApiResponse.error(res, 'You do not have access to this session', 403)
+  }
+
   ApiResponse.success(res, session, 'Session retrieved successfully')
 })
 
 // POST /api/v1/sessions
+// Interviewer invites a candidate by username. interviewerId comes from req.user.
 const createSession = asyncHandler(async (req, res) => {
-  const { title, role, level, scheduledAt, interviewerId, candidateId } = req.body
+  const { title, role, level, scheduledAt, candidateUsername } = req.body
 
-  // Validation
-  const errors = []
-  if (!title) errors.push('title is required')
-  if (!role) errors.push('role is required')
-  if (!level) errors.push('level is required')
-  if (!scheduledAt) errors.push('scheduledAt is required')
-  if (!interviewerId) errors.push('interviewerId is required')
-  if (!candidateId) errors.push('candidateId is required')
+  const candidate = await prisma.user.findUnique({
+    where: { username: candidateUsername },
+    select: { id: true, role: true, name: true },
+  })
 
-  if (errors.length > 0) {
-    return ApiResponse.badRequest(res, 'Validation failed', errors)
+  if (!candidate) {
+    return ApiResponse.notFound(res, `No user found with username "${candidateUsername}"`)
   }
 
-  // Check users exist — select only id to avoid fetching unnecessary fields
-  const [interviewer, candidate] = await Promise.all([
-    prisma.user.findUnique({ where: { id: interviewerId }, select: { id: true } }),
-    prisma.user.findUnique({ where: { id: candidateId },   select: { id: true } }),
-  ])
-
-  if (!interviewer) return ApiResponse.notFound(res, 'Interviewer not found')
-  if (!candidate) return ApiResponse.notFound(res, 'Candidate not found')
+  if (candidate.role !== 'CANDIDATE') {
+    return ApiResponse.badRequest(res, 'The invited user is not a candidate')
+  }
 
   const session = await prisma.interviewSession.create({
     data: {
@@ -93,13 +104,10 @@ const createSession = asyncHandler(async (req, res) => {
       role,
       level,
       scheduledAt: new Date(scheduledAt),
-      interviewerId,
-      candidateId
+      interviewerId: req.user.id,
+      candidateId:   candidate.id,
     },
-    include: {
-      interviewer: { select: { id: true, name: true, email: true } },
-      candidate: { select: { id: true, name: true, email: true } }
-    }
+    select: SESSION_SELECT,
   })
 
   ApiResponse.created(res, session, 'Session created successfully')
@@ -119,13 +127,22 @@ const updateSession = asyncHandler(async (req, res) => {
     )
   }
 
+  // Only the session's interviewer or admin can change status
+  const existing = await prisma.interviewSession.findUnique({
+    where: { id },
+    select: { interviewerId: true },
+  })
+
+  if (!existing) return ApiResponse.notFound(res, `Session with id ${id} not found`)
+
+  if (req.user.role !== 'ADMIN' && existing.interviewerId !== req.user.id) {
+    return ApiResponse.error(res, 'You are not the interviewer of this session', 403)
+  }
+
   const session = await prisma.interviewSession.update({
     where: { id },
     data: { status: status.toUpperCase() },
-    include: {
-      interviewer: { select: { id: true, name: true, email: true } },
-      candidate: { select: { id: true, name: true, email: true } }
-    }
+    select: SESSION_SELECT,
   })
 
   ApiResponse.success(res, session, 'Session updated successfully')

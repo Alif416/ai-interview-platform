@@ -41,38 +41,59 @@ function setupRoomHandlers(io) {
   })
 
   io.on('connection', (socket) => {
-    socket.on('join-room', ({ sessionId }) => {
-      const room = getOrCreateRoom(sessionId)
+    socket.on('join-room', async ({ sessionId }) => {
+      try {
+        // Verify the session exists and the user is allowed in
+        const session = await prisma.interviewSession.findUnique({
+          where: { id: parseInt(sessionId) },
+          select: { interviewerId: true, candidateId: true, status: true },
+        })
 
-      // Remove stale entry for this user (handles reconnects)
-      room.participants = room.participants.filter(
-        (p) => p.userId !== socket.user.id
-      )
-      room.participants.push({
-        userId: socket.user.id,
-        name: socket.user.name,
-        role: socket.user.role,
-        socketId: socket.id,
-      })
+        if (!session) {
+          return socket.emit('room-error', { message: 'Session not found' })
+        }
 
-      socket.join(sessionId)
-      socket.sessionId = sessionId
+        const isAllowed =
+          socket.user.role === 'ADMIN' ||
+          session.interviewerId === socket.user.id ||
+          session.candidateId  === socket.user.id
 
-      // Send full room state including selected problem
-      socket.emit('room-state', {
-        participants: room.participants,
-        code: room.code,
-        language: room.language,
-        messages: room.messages,
-        selectedProblem: room.selectedProblem,
-      })
+        if (!isAllowed) {
+          return socket.emit('room-error', { message: 'You are not invited to this session' })
+        }
 
-      // Notify others
-      socket.to(sessionId).emit('user-joined', {
-        userId: socket.user.id,
-        name: socket.user.name,
-        participants: room.participants,
-      })
+        const room = getOrCreateRoom(sessionId)
+
+        // Remove stale entry for this user (handles reconnects)
+        room.participants = room.participants.filter(
+          (p) => p.userId !== socket.user.id
+        )
+        room.participants.push({
+          userId: socket.user.id,
+          name: socket.user.name,
+          role: socket.user.role,
+          socketId: socket.id,
+        })
+
+        socket.join(sessionId)
+        socket.sessionId = sessionId
+
+        socket.emit('room-state', {
+          participants: room.participants,
+          code: room.code,
+          language: room.language,
+          messages: room.messages,
+          selectedProblem: room.selectedProblem,
+        })
+
+        socket.to(sessionId).emit('user-joined', {
+          userId: socket.user.id,
+          name: socket.user.name,
+          participants: room.participants,
+        })
+      } catch {
+        socket.emit('room-error', { message: 'Failed to join room' })
+      }
     })
 
     socket.on('code-change', ({ sessionId, code }) => {
@@ -117,7 +138,6 @@ function setupRoomHandlers(io) {
       })
     })
 
-    // Interviewer/Admin selects a problem for the room
     socket.on('select-problem', ({ sessionId, problemId }) => {
       const room = rooms.get(sessionId)
       if (!room) return
@@ -128,7 +148,6 @@ function setupRoomHandlers(io) {
 
       room.selectedProblem = problemId
 
-      // Broadcast to everyone in the room including sender
       io.to(sessionId).emit('problem-selected', {
         problemId,
         selectedBy: socket.user.id,
