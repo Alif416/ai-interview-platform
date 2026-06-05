@@ -209,7 +209,7 @@ export default function Home() {
         <div className="flex items-center gap-2.5">
           <LCLogo size={28} />
           <span className="font-bold text-base tracking-tight" style={{ color: 'var(--lc-text)' }}>
-            Interview<span style={{ color: 'var(--lc-orange)' }}>AI</span>
+            LevelUp<span style={{ color: 'var(--lc-orange)' }}>.io</span>
           </span>
         </div>
 
@@ -472,7 +472,7 @@ export default function Home() {
                 Your next offer starts here
               </h2>
               <p className="text-sm max-w-sm mx-auto mb-8" style={{ color: 'var(--lc-text-3)' }}>
-                Join engineers who use InterviewAI to practice smarter, get real feedback, and walk into interviews with confidence.
+                Join engineers who use LevelUp.io to practice smarter, get real feedback, and walk into interviews with confidence.
               </p>
               <div className="flex items-center justify-center gap-3 flex-wrap">
                 <Link to="/register" className="lc-btn-primary" style={{ fontSize: '14px', padding: '11px 32px', borderRadius: '10px' }}>
@@ -496,11 +496,11 @@ export default function Home() {
           <div className="flex items-center gap-2">
             <LCLogo size={22} />
             <span className="text-sm font-semibold" style={{ color: 'var(--lc-text-2)' }}>
-              Interview<span style={{ color: 'var(--lc-orange)' }}>AI</span>
+              LevelUp<span style={{ color: 'var(--lc-orange)' }}>.io</span>
             </span>
           </div>
           <p className="text-xs" style={{ color: 'var(--lc-muted)' }}>
-            © 2025 InterviewAI · Built for engineers who want to level up
+            © 2025 LevelUp.io · Built for engineers who want to level up
           </p>
           <div className="flex items-center gap-5">
             <Link to="/login" className="text-xs transition-colors" style={{ color: 'var(--lc-text-3)' }}

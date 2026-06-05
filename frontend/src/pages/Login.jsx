@@ -48,7 +48,7 @@ export default function Login() {
         <div className="flex items-center gap-2.5">
           <LCLogo size={28} />
           <span className="font-semibold text-base" style={{ color: 'var(--lc-text)' }}>
-            Interview<span style={{ color: 'var(--lc-orange)' }}>AI</span>
+            LevelUp<span style={{ color: 'var(--lc-orange)' }}>.io</span>
           </span>
         </div>
       </header>
@@ -151,7 +151,7 @@ export default function Login() {
       {/* Footer */}
       <footer className="text-center pb-6">
         <p className="text-xs" style={{ color: 'var(--lc-text-3)' }}>
-          © 2025 InterviewAI · Built for engineers who want to level up
+          © 2025 LevelUp.io · Built for engineers who want to level up
         </p>
       </footer>
     </div>

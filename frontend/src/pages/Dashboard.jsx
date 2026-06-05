@@ -743,7 +743,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-2 mr-4">
             <LCLogo size={26} />
             <span className="font-semibold text-sm hidden sm:block" style={{ color: 'var(--lc-text)' }}>
-              Interview<span style={{ color: 'var(--lc-orange)' }}>AI</span>
+              LevelUp<span style={{ color: 'var(--lc-orange)' }}>.io</span>
             </span>
           </div>
 
