@@ -1048,7 +1048,7 @@ export default function LiveInterviewRoom() {
 
       {/* ── Mobile tab bar ──────────────────────────────────────────────── */}
       <div
-        className="lg:hidden shrink-0 flex border-b"
+        className="shrink-0 flex border-b"
         style={{ backgroundColor: 'var(--lc-nav)', borderColor: 'var(--lc-border)' }}
       >
         {[
@@ -1083,7 +1083,7 @@ export default function LiveInterviewRoom() {
 
         {/* ── Problem Panel ─────────────────────────────────────────────── */}
         <div
-          className={`flex-col border-r min-h-0 ${mobileTab === 'problem' ? 'flex' : 'hidden'} lg:flex`}
+          className={`flex-col border-r min-h-0 ${mobileTab === 'problem' ? 'flex' : 'hidden'}`}
           style={{
             width: '100%',
             maxWidth: '100%',
@@ -1102,7 +1102,7 @@ export default function LiveInterviewRoom() {
 
         {/* ── Code Editor + Results ──────────────────────────────────────── */}
         <div
-          className={`flex-col flex-1 min-h-0 min-w-0 ${mobileTab === 'code' ? 'flex' : 'hidden'} lg:flex`}
+          className={`flex-col flex-1 min-h-0 min-w-0 ${mobileTab === 'code' ? 'flex' : 'hidden'}`}
           style={{ borderRight: '1px solid var(--lc-border)' }}
         >
           {/* Editor toolbar */}
@@ -1210,7 +1210,7 @@ export default function LiveInterviewRoom() {
 
         {/* ── Chat Panel ────────────────────────────────────────────────── */}
         <div
-          className={`flex-col min-h-0 ${mobileTab === 'chat' ? 'flex' : 'hidden'} lg:flex`}
+          className={`flex-col min-h-0 ${mobileTab === 'chat' ? 'flex' : 'hidden'}`}
           style={{ width: '100%', maxWidth: '100%', backgroundColor: 'var(--lc-surface)' }}
         >
           <style>{`@media (min-width: 1024px) { .chat-pane { width: 300px !important; max-width: 300px !important; flex-shrink: 0 !important; } }`}</style>
