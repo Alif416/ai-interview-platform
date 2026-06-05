@@ -8,7 +8,7 @@ const client = new Anthropic({
 // Generate interview questions for a role and level
 const generateInterviewQuestions = async (role, level, topic, count = 5) => {
   const message = await client.messages.create({
-    model: 'claude-haiku-4-5',
+    model: 'claude-haiku-4-5-20251001',
     max_tokens: 2000,
     messages: [
       {

@@ -100,6 +100,7 @@ export default function AIInterview() {
   const [evaluation, setEvaluation]   = useState(null)
   const [generating, setGenerating]   = useState(false)
   const [evaluating, setEvaluating]   = useState(false)
+  const [generateError, setGenerateError] = useState(null)
   const [submitError, setSubmitError] = useState(null)
   const [leftTab, setLeftTab]         = useState('description')
   const [rightTab, setRightTab]       = useState('answer')
@@ -127,13 +128,17 @@ export default function AIInterview() {
 
   const generateQuestions = async () => {
     setGenerating(true)
+    setGenerateError(null)
     setQuestions([])
     setSelected(null)
     setEvaluation(null)
     try {
       const { data } = await api.post('/ai/questions', config)
       setQuestions(data.data.questions)
-    } catch (e) { console.error(e) }
+    } catch (e) {
+      console.error(e)
+      setGenerateError(e.response?.data?.message || 'Failed to generate questions. Please try again.')
+    }
     finally { setGenerating(false) }
   }
 
@@ -350,6 +355,11 @@ export default function AIInterview() {
               </>
             )}
           </button>
+          {generateError && (
+            <p className="text-xs text-center mt-2" style={{ color: 'var(--lc-hard)' }}>
+              {generateError}
+            </p>
+          )}
         </div>
       </div>
     )
