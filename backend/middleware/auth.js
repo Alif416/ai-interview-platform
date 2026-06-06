@@ -4,13 +4,19 @@ const ApiResponse = require('../utils/apiResponse')
 
 const authenticate = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization
+    // Read from httpOnly cookie first, fall back to Authorization header
+    let token = req.cookies?.token
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return ApiResponse.unauthorized(res, 'No token provided')
+    if (!token) {
+      const authHeader = req.headers.authorization
+      if (authHeader?.startsWith('Bearer ')) {
+        token = authHeader.split(' ')[1]
+      }
     }
 
-    const token = authHeader.split(' ')[1]
+    if (!token) {
+      return ApiResponse.unauthorized(res, 'No token provided')
+    }
 
     const decoded = verifyToken(token)
 
@@ -33,10 +39,7 @@ const authenticate = async (req, res, next) => {
       return ApiResponse.unauthorized(res, 'User no longer exists')
     }
 
-    // 5. Attach user to request object
-    // Now every controller can access req.user
     req.user = user
-
     next()
   } catch (error) {
     return ApiResponse.unauthorized(res, 'Authentication failed')

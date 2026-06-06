@@ -7,6 +7,7 @@ const config = {
   DATABASE_URL: process.env.DATABASE_URL,
   JWT_SECRET: process.env.JWT_SECRET,
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '7d',
+  COOKIE_MAX_AGE: 7 * 24 * 60 * 60 * 1000,
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
   REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379'
 }

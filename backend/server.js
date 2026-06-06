@@ -1,4 +1,5 @@
 const express = require('express')
+const cookieParser = require('cookie-parser')
 const config = require('./config/config')
 const logger = require('./middleware/logger')
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler')
@@ -10,6 +11,7 @@ const app = express()
 // ── Core Middleware ──────────────────────────────
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
+app.use(cookieParser())
 app.use(logger)
 app.use(globalLimiter)
 

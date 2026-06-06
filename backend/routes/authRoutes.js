@@ -1,6 +1,6 @@
 const express = require('express')
 const router = express.Router()
-const { register, login, getMe } = require('../controllers/authController')
+const { register, login, logout, getMe } = require('../controllers/authController')
 const { authenticate } = require('../middleware/auth')
 const { loginLimiter, registerLimiter } = require('../middleware/rateLimit')
 const validate = require('../middleware/validate')
@@ -10,5 +10,6 @@ const { registerSchema, loginSchema } = require('../utils/validators')
 router.post('/register', registerLimiter, validate(registerSchema), register)
 router.post('/login', loginLimiter, validate(loginSchema), login)
 router.get('/me', authenticate, getMe)
+router.post('/logout', logout)
 
 module.exports = router

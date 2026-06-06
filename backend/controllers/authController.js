@@ -3,6 +3,14 @@ const { prisma } = require('../config/database')
 const { generateToken } = require('../utils/jwt')
 const ApiResponse = require('../utils/apiResponse')
 const asyncHandler = require('../middleware/asyncHandler')
+const config = require('../config/config')
+
+const cookieOptions = {
+  httpOnly: true,
+  secure: config.NODE_ENV === 'production',
+  sameSite: 'lax',
+  maxAge: config.COOKIE_MAX_AGE,
+}
 
 // POST /api/v1/auth/register
 const register = asyncHandler(async (req, res) => {
@@ -24,7 +32,8 @@ const register = asyncHandler(async (req, res) => {
 
   const token = generateToken({ userId: user.id, role: user.role })
 
-  ApiResponse.created(res, { user, token }, 'Registration successful')
+  res.cookie('token', token, cookieOptions)
+  ApiResponse.created(res, { user }, 'Registration successful')
 })
 
 // POST /api/v1/auth/login
@@ -48,7 +57,14 @@ const login = asyncHandler(async (req, res) => {
   const token = generateToken({ userId: user.id, role: user.role })
   const { password: _, ...userWithoutPassword } = user
 
-  ApiResponse.success(res, { user: userWithoutPassword, token }, 'Login successful')
+  res.cookie('token', token, cookieOptions)
+  ApiResponse.success(res, { user: userWithoutPassword }, 'Login successful')
+})
+
+// POST /api/v1/auth/logout
+const logout = asyncHandler(async (req, res) => {
+  res.clearCookie('token', { httpOnly: true, sameSite: 'lax', secure: config.NODE_ENV === 'production' })
+  ApiResponse.success(res, null, 'Logged out successfully')
 })
 
 // GET /api/v1/auth/me
@@ -56,4 +72,4 @@ const getMe = asyncHandler(async (req, res) => {
   ApiResponse.success(res, req.user, 'User retrieved successfully')
 })
 
-module.exports = { register, login, getMe }
+module.exports = { register, login, logout, getMe }
