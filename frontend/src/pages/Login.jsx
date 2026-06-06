@@ -116,6 +116,9 @@ export default function Login() {
                   <label className="text-xs font-medium" style={{ color: 'var(--lc-text-2)' }}>
                     Password
                   </label>
+                  <Link to="/forgot-password" className="text-xs" style={{ color: 'var(--lc-orange)' }}>
+                    Forgot password?
+                  </Link>
                 </div>
                 <input
                   type="password"

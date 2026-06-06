@@ -73,12 +73,28 @@ const globalLimiter = createLimiter({
   message: 'Too many requests from this IP. Please slow down.',
 })
 
-// 10 req / 15 min per IP — brute-force guard on login/register
-const authLimiter = createLimiter({
-  max: 10,
+// 5 req / 15 min per IP — brute-force guard on login
+const loginLimiter = createLimiter({
+  max: 5,
   windowSecs: 15 * 60,
-  keyFn: (req) => `auth:${req.ip}`,
-  message: 'Too many authentication attempts. Try again in 15 minutes.',
+  keyFn: (req) => `login:${req.ip}`,
+  message: 'Too many login attempts. You can try again in 15 minutes.',
+})
+
+// 10 req / hour per IP — spam guard on register
+const registerLimiter = createLimiter({
+  max: 10,
+  windowSecs: 60 * 60,
+  keyFn: (req) => `register:${req.ip}`,
+  message: 'Too many registration attempts. You can try again in 1 hour.',
+})
+
+// 3 req / hour per IP — prevent email bombing on forgot-password
+const forgotPasswordLimiter = createLimiter({
+  max: 3,
+  windowSecs: 60 * 60,
+  keyFn: (req) => `forgot:${req.ip}`,
+  message: 'Too many password reset requests. You can try again in 1 hour.',
 })
 
 // 30 req / hour per authenticated user — AI calls are expensive
@@ -89,4 +105,4 @@ const aiLimiter = createLimiter({
   message: 'AI request limit reached. You can make 30 AI requests per hour.',
 })
 
-module.exports = { globalLimiter, authLimiter, aiLimiter, createLimiter }
+module.exports = { globalLimiter, loginLimiter, registerLimiter, forgotPasswordLimiter, aiLimiter, createLimiter }

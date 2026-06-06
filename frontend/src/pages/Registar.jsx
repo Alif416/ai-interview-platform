@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 function LCLogo({ size = 32 }) {
@@ -39,8 +39,8 @@ export default function Register() {
   const [formData, setFormData] = useState({ name: '', username: '', email: '', password: '', role: 'CANDIDATE' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [registeredEmail, setRegisteredEmail] = useState(null)
   const { register } = useAuth()
-  const navigate = useNavigate()
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value })
 
@@ -50,12 +50,56 @@ export default function Register() {
     setLoading(true)
     try {
       await register(formData.name, formData.username, formData.email, formData.password, formData.role)
-      navigate('/dashboard')
+      setRegisteredEmail(formData.email)
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed. Please try again.')
     } finally {
       setLoading(false)
     }
+  }
+
+  if (registeredEmail) {
+    return (
+      <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--lc-bg)' }}>
+        <header
+          className="flex items-center px-6 h-14 border-b shrink-0"
+          style={{ backgroundColor: 'var(--lc-nav)', borderColor: 'var(--lc-border)' }}
+        >
+          <div className="flex items-center gap-2.5">
+            <LCLogo size={28} />
+            <span className="font-semibold text-base" style={{ color: 'var(--lc-text)' }}>
+              LevelUp<span style={{ color: 'var(--lc-orange)' }}>.io</span>
+            </span>
+          </div>
+        </header>
+        <div className="flex-1 flex items-center justify-center px-4">
+          <div
+            className="w-full max-w-sm rounded-2xl border p-8 text-center"
+            style={{ backgroundColor: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}
+          >
+            <div
+              className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4"
+              style={{ backgroundColor: 'rgba(255,161,22,0.15)' }}
+            >
+              <svg className="w-6 h-6" fill="none" stroke="var(--lc-orange)" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <h2 className="text-lg font-semibold mb-2" style={{ color: 'var(--lc-text)' }}>Check your email</h2>
+            <p className="text-sm mb-1" style={{ color: 'var(--lc-muted)' }}>
+              We sent a verification link to
+            </p>
+            <p className="text-sm font-medium mb-6" style={{ color: 'var(--lc-text)' }}>{registeredEmail}</p>
+            <p className="text-xs mb-6" style={{ color: 'var(--lc-muted)' }}>
+              Click the link in the email to activate your account. The link expires in 24 hours.
+            </p>
+            <Link to="/login" className="text-sm" style={{ color: 'var(--lc-orange)' }}>
+              Back to Login
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (

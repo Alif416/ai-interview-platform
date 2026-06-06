@@ -74,9 +74,22 @@ const sessionQuerySchema = z.object({
   limit: z.string().regex(/^\d+$/).optional().transform(Number)
 })
 
+const forgotPasswordSchema = z.object({
+  email: z.string().email('Please provide a valid email').toLowerCase()
+})
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(1, 'Token is required'),
+  password: z.string()
+    .min(6, 'Password must be at least 6 characters')
+    .max(100, 'Password too long')
+})
+
 module.exports = {
   registerSchema,
   loginSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
   createSessionSchema,
   updateSessionSchema,
   sessionQuerySchema
