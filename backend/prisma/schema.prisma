@@ -21,6 +21,10 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  isVerified              Boolean   @default(false)
+  verificationToken       String?   @unique
+  verificationTokenExpiry DateTime?
+
   // Relations
   hostedSessions   InterviewSession[] @relation("Interviewer")
   attendedSessions InterviewSession[] @relation("Candidate")

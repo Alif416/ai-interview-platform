@@ -9,7 +9,10 @@ const config = {
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '7d',
   COOKIE_MAX_AGE: 7 * 24 * 60 * 60 * 1000,
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
-  REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379'
+  REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
+  EMAIL_USER: process.env.EMAIL_USER,
+  EMAIL_PASS: process.env.EMAIL_PASS,
+  FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:5173'
 }
 
 module.exports = config
