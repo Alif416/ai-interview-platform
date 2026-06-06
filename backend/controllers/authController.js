@@ -5,7 +5,7 @@ const { generateToken } = require('../utils/jwt')
 const ApiResponse = require('../utils/apiResponse')
 const asyncHandler = require('../middleware/asyncHandler')
 const config = require('../config/config')
-const { sendVerificationEmail } = require('../services/emailService')
+const { sendVerificationEmail, sendPasswordResetEmail } = require('../services/emailService')
 
 const cookieOptions = {
   httpOnly: true,
@@ -97,6 +97,58 @@ const resendVerification = asyncHandler(async (req, res) => {
   ApiResponse.success(res, null, 'If that email exists and is unverified, a new link has been sent.')
 })
 
+// POST /api/v1/auth/forgot-password
+const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body
+
+  const user = await prisma.user.findUnique({ where: { email } })
+
+  // Always return the same response to prevent email enumeration
+  if (!user) {
+    return ApiResponse.success(res, null, 'If that email is registered, a reset link has been sent.')
+  }
+
+  const resetToken = crypto.randomBytes(32).toString('hex')
+  const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000) // 1 hour
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { resetToken, resetTokenExpiry }
+  })
+
+  await sendPasswordResetEmail(email, user.name, resetToken)
+
+  ApiResponse.success(res, null, 'If that email is registered, a reset link has been sent.')
+})
+
+// POST /api/v1/auth/reset-password
+const resetPassword = asyncHandler(async (req, res) => {
+  const { token, password } = req.body
+
+  if (!token) return ApiResponse.badRequest(res, 'Reset token is required')
+
+  const user = await prisma.user.findUnique({ where: { resetToken: token } })
+
+  if (!user) return ApiResponse.badRequest(res, 'Invalid or expired reset link')
+
+  if (user.resetTokenExpiry < new Date()) {
+    return ApiResponse.badRequest(res, 'Reset link has expired. Please request a new one.')
+  }
+
+  const hashedPassword = await bcrypt.hash(password, 12)
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      password: hashedPassword,
+      resetToken: null,
+      resetTokenExpiry: null,
+    }
+  })
+
+  ApiResponse.success(res, null, 'Password reset successfully. You can now log in with your new password.')
+})
+
 // POST /api/v1/auth/login
 const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body
@@ -137,4 +189,4 @@ const getMe = asyncHandler(async (req, res) => {
   ApiResponse.success(res, req.user, 'User retrieved successfully')
 })
 
-module.exports = { register, login, logout, verifyEmail, resendVerification, getMe }
+module.exports = { register, login, logout, verifyEmail, resendVerification, forgotPassword, resetPassword, getMe }

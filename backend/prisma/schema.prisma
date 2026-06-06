@@ -25,6 +25,9 @@ model User {
   verificationToken       String?   @unique
   verificationTokenExpiry DateTime?
 
+  resetToken              String?   @unique
+  resetTokenExpiry        DateTime?
+
   // Relations
   hostedSessions   InterviewSession[] @relation("Interviewer")
   attendedSessions InterviewSession[] @relation("Candidate")

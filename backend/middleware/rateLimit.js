@@ -89,6 +89,14 @@ const registerLimiter = createLimiter({
   message: 'Too many registration attempts. You can try again in 1 hour.',
 })
 
+// 3 req / hour per IP — prevent email bombing on forgot-password
+const forgotPasswordLimiter = createLimiter({
+  max: 3,
+  windowSecs: 60 * 60,
+  keyFn: (req) => `forgot:${req.ip}`,
+  message: 'Too many password reset requests. You can try again in 1 hour.',
+})
+
 // 30 req / hour per authenticated user — AI calls are expensive
 const aiLimiter = createLimiter({
   max: 30,
@@ -97,4 +105,4 @@ const aiLimiter = createLimiter({
   message: 'AI request limit reached. You can make 30 AI requests per hour.',
 })
 
-module.exports = { globalLimiter, loginLimiter, registerLimiter, aiLimiter, createLimiter }
+module.exports = { globalLimiter, loginLimiter, registerLimiter, forgotPasswordLimiter, aiLimiter, createLimiter }
