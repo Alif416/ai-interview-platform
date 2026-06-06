@@ -10,9 +10,14 @@ const { setupRoomHandlers } = require('./sockets/roomHandler')
 
 const server = http.createServer(app)
 
+const ALLOWED_ORIGINS = [
+  'http://localhost:5173',
+  process.env.CLIENT_URL,
+].filter(Boolean)
+
 const io = new Server(server, {
   cors: {
-    origin: 'http://localhost:5173',
+    origin: ALLOWED_ORIGINS,
     methods: ['GET', 'POST'],
     credentials: true
   }
