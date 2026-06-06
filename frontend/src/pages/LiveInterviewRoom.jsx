@@ -709,7 +709,7 @@ export default function LiveInterviewRoom() {
   // ── Socket.IO ───────────────────────────────────────────────────────────
   useEffect(() => {
     const token = localStorage.getItem('token')
-    const s = io('http://localhost:3000', {
+    const s = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000', {
       auth: { token },
       transports: ['websocket'],
     })
@@ -780,7 +780,7 @@ export default function LiveInterviewRoom() {
   // ── Yjs ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     const ydoc = new Y.Doc()
-    const provider = new WebsocketProvider('ws://localhost:3001', sessionId, ydoc, { connect: true })
+    const provider = new WebsocketProvider(import.meta.env.VITE_YJS_URL || 'ws://localhost:3001', sessionId, ydoc, { connect: true })
 
     ydocRef.current = ydoc
     providerRef.current = provider

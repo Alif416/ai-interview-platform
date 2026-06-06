@@ -40,7 +40,7 @@ export default function SessionList() {
   useEffect(() => {
     const load = async () => {
       try {
-        const res  = await fetch('http://localhost:3000/api/v1/sessions')
+        const res  = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1'}/sessions`)
         const json = await res.json()
         if (json.success) setSessions(json.data.sessions)
         else setError('Failed to load sessions')
