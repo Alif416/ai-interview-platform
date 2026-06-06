@@ -1,20 +1,16 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import api from '../api/axios'
 
-// 1. Create the context
 const AuthContext = createContext(null)
 
-// 2. Create the provider — wraps your entire app
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  // Check if user is already logged in on app startup
+  // On startup, restore user profile from localStorage (token lives in httpOnly cookie)
   useEffect(() => {
     const storedUser = localStorage.getItem('user')
-    const token = localStorage.getItem('token')
-
-    if (storedUser && token) {
+    if (storedUser) {
       setUser(JSON.parse(storedUser))
     }
     setLoading(false)
@@ -22,10 +18,9 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const { data } = await api.post('/auth/login', { email, password })
-    const { user, token } = data.data
+    const { user } = data.data
 
-    // Store in localStorage — persists across page refreshes
-    localStorage.setItem('token', token)
+    // Token is set as httpOnly cookie by the server — we only store user profile
     localStorage.setItem('user', JSON.stringify(user))
     setUser(user)
 
@@ -36,29 +31,32 @@ export function AuthProvider({ children }) {
     const { data } = await api.post('/auth/register', {
       name, username, email, password, role
     })
-    const { user, token } = data.data
+    const { user } = data.data
 
-    localStorage.setItem('token', token)
     localStorage.setItem('user', JSON.stringify(user))
     setUser(user)
 
     return user
   }
 
-  const logout = () => {
-    localStorage.removeItem('token')
+  const logout = async () => {
+    try {
+      // Ask server to clear the httpOnly cookie
+      await api.post('/auth/logout')
+    } catch {
+      // Continue with client-side cleanup even if server call fails
+    }
     localStorage.removeItem('user')
     setUser(null)
   }
 
-  // Value available to ALL components inside AuthProvider
   const value = {
     user,
     loading,
     login,
     register,
     logout,
-    isAuthenticated: !!user  // converts user to boolean
+    isAuthenticated: !!user
   }
 
   return (
@@ -68,7 +66,6 @@ export function AuthProvider({ children }) {
   )
 }
 
-// 3. Custom hook — clean way to use auth anywhere
 export function useAuth() {
   const context = useContext(AuthContext)
   if (!context) {
