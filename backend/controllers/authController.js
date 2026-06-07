@@ -38,7 +38,11 @@ const register = asyncHandler(async (req, res) => {
     select: { id: true, name: true, username: true, email: true, role: true, createdAt: true }
   })
 
-  await sendVerificationEmail(email, name, verificationToken)
+  try {
+    await sendVerificationEmail(email, name, verificationToken)
+  } catch (emailErr) {
+    console.error('Verification email failed to send:', emailErr.message)
+  }
 
   ApiResponse.created(res, { email: user.email }, 'Registration successful. Please check your email to verify your account.')
 })
@@ -116,7 +120,11 @@ const forgotPassword = asyncHandler(async (req, res) => {
     data: { resetToken, resetTokenExpiry }
   })
 
-  await sendPasswordResetEmail(email, user.name, resetToken)
+  try {
+    await sendPasswordResetEmail(email, user.name, resetToken)
+  } catch (emailErr) {
+    console.error('Password reset email failed to send:', emailErr.message)
+  }
 
   ApiResponse.success(res, null, 'If that email is registered, a reset link has been sent.')
 })
