@@ -25,7 +25,7 @@ const register = asyncHandler(async (req, res) => {
   if (existingEmail) return ApiResponse.badRequest(res, 'Email already registered')
   if (existingUsername) return ApiResponse.badRequest(res, 'Username already taken')
 
-  const hashedPassword = await bcrypt.hash(password, 12)
+  const hashedPassword = await bcrypt.hash(password, 10)
   const verificationToken = crypto.randomBytes(32).toString('hex')
   const verificationTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
 
@@ -38,11 +38,8 @@ const register = asyncHandler(async (req, res) => {
     select: { id: true, name: true, username: true, email: true, role: true, createdAt: true }
   })
 
-  try {
-    await sendVerificationEmail(email, name, verificationToken)
-  } catch (emailErr) {
-    console.error('Verification email failed to send:', emailErr.message)
-  }
+  sendVerificationEmail(email, name, verificationToken)
+    .catch(err => console.error('Verification email failed to send:', err.message))
 
   ApiResponse.created(res, { email: user.email }, 'Registration successful. Please check your email to verify your account.')
 })
