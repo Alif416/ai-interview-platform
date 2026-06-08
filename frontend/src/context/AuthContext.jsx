@@ -11,7 +11,13 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const storedUser = localStorage.getItem('user')
     if (storedUser) {
-      setUser(JSON.parse(storedUser))
+      try {
+        const parsed = JSON.parse(storedUser)
+        if (parsed && typeof parsed === 'object') setUser(parsed)
+        else localStorage.removeItem('user')
+      } catch {
+        localStorage.removeItem('user')
+      }
     }
     setLoading(false)
   }, [])
@@ -21,7 +27,7 @@ export function AuthProvider({ children }) {
     const { user } = data.data
 
     // Token is set as httpOnly cookie by the server — we only store user profile
-    localStorage.setItem('user', JSON.stringify(user))
+    if (user) localStorage.setItem('user', JSON.stringify(user))
     setUser(user)
 
     return user
