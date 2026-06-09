@@ -1,11 +1,14 @@
 const bcrypt = require('bcrypt')
 const crypto = require('crypto')
 const { prisma } = require('../config/database')
+const { getRedis } = require('../config/redis')
 const { generateToken } = require('../utils/jwt')
 const ApiResponse = require('../utils/apiResponse')
 const asyncHandler = require('../middleware/asyncHandler')
 const config = require('../config/config')
 const { sendVerificationEmail, sendPasswordResetEmail } = require('../services/emailService')
+
+const PENDING_TTL = 24 * 60 * 60 // 24 hours in seconds
 
 const cookieOptions = {
   httpOnly: true,
@@ -17,7 +20,9 @@ const cookieOptions = {
 // POST /api/v1/auth/register
 const register = asyncHandler(async (req, res) => {
   const { name, username, email, password, role } = req.body
+  const redis = getRedis()
 
+  // Check DB for already-verified accounts
   const [existingEmail, existingUsername] = await Promise.all([
     prisma.user.findUnique({ where: { email } }),
     prisma.user.findUnique({ where: { username } }),
@@ -25,49 +30,86 @@ const register = asyncHandler(async (req, res) => {
   if (existingEmail) return ApiResponse.badRequest(res, 'Email already registered')
   if (existingUsername) return ApiResponse.badRequest(res, 'Username already taken')
 
+  // Check Redis for pending (unverified) registrations with same username
+  const pendingUsernameToken = await redis.get(`pending:username:${username}`)
+  if (pendingUsernameToken) {
+    const pendingData = await redis.get(`pending:reg:${pendingUsernameToken}`)
+    if (pendingData) {
+      const pending = JSON.parse(pendingData)
+      if (pending.email !== email) {
+        return ApiResponse.badRequest(res, 'Username already taken')
+      }
+    }
+  }
+
+  // If this email already has a pending registration, overwrite it
+  const existingPendingToken = await redis.get(`pending:email:${email}`)
+  if (existingPendingToken) {
+    await redis.del(`pending:reg:${existingPendingToken}`)
+  }
+
   const hashedPassword = await bcrypt.hash(password, 10)
-  const verificationToken = crypto.randomBytes(32).toString('hex')
-  const verificationTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+  const token = crypto.randomBytes(32).toString('hex')
 
-  const user = await prisma.user.create({
-    data: {
-      name, username, email, password: hashedPassword, role,
-      verificationToken,
-      verificationTokenExpiry,
-    },
-    select: { id: true, name: true, username: true, email: true, role: true, createdAt: true }
-  })
+  const pendingData = JSON.stringify({ name, username, email, hashedPassword, role })
 
-  sendVerificationEmail(email, name, verificationToken)
-    .catch(err => console.error('Verification email failed to send:', err.message))
+  await Promise.all([
+    redis.set(`pending:reg:${token}`, pendingData, 'EX', PENDING_TTL),
+    redis.set(`pending:email:${email}`, token, 'EX', PENDING_TTL),
+    redis.set(`pending:username:${username}`, token, 'EX', PENDING_TTL),
+  ])
 
-  ApiResponse.created(res, { email: user.email }, 'Registration successful. Please check your email to verify your account.')
+  try {
+    await sendVerificationEmail(email, name, token)
+  } catch (err) {
+    // Clean up Redis if email fails so user can retry
+    await Promise.all([
+      redis.del(`pending:reg:${token}`),
+      redis.del(`pending:email:${email}`),
+      redis.del(`pending:username:${username}`),
+    ])
+    console.error('Verification email failed:', err.message)
+    return ApiResponse.error(res, 'Failed to send verification email. Please check your email address and try again.', 500)
+  }
+
+  ApiResponse.created(res, { email }, 'Registration successful. Please check your email to verify your account.')
 })
 
 // GET /api/v1/auth/verify-email?token=...
 const verifyEmail = asyncHandler(async (req, res) => {
   const { token } = req.query
-
   if (!token) return ApiResponse.badRequest(res, 'Verification token is required')
 
-  const user = await prisma.user.findUnique({
-    where: { verificationToken: token }
-  })
+  const redis = getRedis()
+  const rawData = await redis.get(`pending:reg:${token}`)
 
-  if (!user) return ApiResponse.badRequest(res, 'Invalid or expired verification link')
+  if (!rawData) return ApiResponse.badRequest(res, 'Invalid or expired verification link')
 
-  if (user.verificationTokenExpiry < new Date()) {
-    return ApiResponse.badRequest(res, 'Verification link has expired. Please request a new one.')
+  const { name, username, email, hashedPassword, role } = JSON.parse(rawData)
+
+  // Guard against double-click / race condition
+  const alreadyExists = await prisma.user.findUnique({ where: { email } })
+  if (alreadyExists) {
+    await redis.del(`pending:reg:${token}`, `pending:email:${email}`, `pending:username:${username}`)
+    return ApiResponse.success(res, null, 'Email already verified. You can now log in.')
   }
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      isVerified: true,
-      verificationToken: null,
-      verificationTokenExpiry: null,
-    }
+  // Username might have been claimed by someone else during pending window
+  const usernameTaken = await prisma.user.findUnique({ where: { username } })
+  if (usernameTaken) {
+    await redis.del(`pending:reg:${token}`, `pending:email:${email}`, `pending:username:${username}`)
+    return ApiResponse.badRequest(res, 'Your username was taken while your verification was pending. Please register again with a different username.')
+  }
+
+  await prisma.user.create({
+    data: { name, username, email, password: hashedPassword, role },
   })
+
+  await Promise.all([
+    redis.del(`pending:reg:${token}`),
+    redis.del(`pending:email:${email}`),
+    redis.del(`pending:username:${username}`),
+  ])
 
   ApiResponse.success(res, null, 'Email verified successfully. You can now log in.')
 })
@@ -75,25 +117,32 @@ const verifyEmail = asyncHandler(async (req, res) => {
 // POST /api/v1/auth/resend-verification
 const resendVerification = asyncHandler(async (req, res) => {
   const { email } = req.body
-
   if (!email) return ApiResponse.badRequest(res, 'Email is required')
 
-  const user = await prisma.user.findUnique({ where: { email } })
+  const redis = getRedis()
+  const existingToken = await redis.get(`pending:email:${email}`)
 
   // Always return success to avoid email enumeration
-  if (!user || user.isVerified) {
+  if (!existingToken) {
     return ApiResponse.success(res, null, 'If that email exists and is unverified, a new link has been sent.')
   }
 
-  const verificationToken = crypto.randomBytes(32).toString('hex')
-  const verificationTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000)
+  const rawData = await redis.get(`pending:reg:${existingToken}`)
+  if (!rawData) {
+    return ApiResponse.success(res, null, 'If that email exists and is unverified, a new link has been sent.')
+  }
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { verificationToken, verificationTokenExpiry }
-  })
+  const data = JSON.parse(rawData)
+  const newToken = crypto.randomBytes(32).toString('hex')
 
-  await sendVerificationEmail(email, user.name, verificationToken)
+  await Promise.all([
+    redis.del(`pending:reg:${existingToken}`),
+    redis.set(`pending:reg:${newToken}`, rawData, 'EX', PENDING_TTL),
+    redis.set(`pending:email:${email}`, newToken, 'EX', PENDING_TTL),
+    redis.set(`pending:username:${data.username}`, newToken, 'EX', PENDING_TTL),
+  ])
+
+  await sendVerificationEmail(email, data.name, newToken)
 
   ApiResponse.success(res, null, 'If that email exists and is unverified, a new link has been sent.')
 })
@@ -104,7 +153,6 @@ const forgotPassword = asyncHandler(async (req, res) => {
 
   const user = await prisma.user.findUnique({ where: { email } })
 
-  // Always return the same response to prevent email enumeration
   if (!user) {
     return ApiResponse.success(res, null, 'If that email is registered, a reset link has been sent.')
   }
@@ -140,7 +188,7 @@ const resetPassword = asyncHandler(async (req, res) => {
     return ApiResponse.badRequest(res, 'Reset link has expired. Please request a new one.')
   }
 
-  const hashedPassword = await bcrypt.hash(password, 12)
+  const hashedPassword = await bcrypt.hash(password, 10)
 
   await prisma.user.update({
     where: { id: user.id },
@@ -160,7 +208,7 @@ const login = asyncHandler(async (req, res) => {
 
   const user = await prisma.user.findUnique({
     where: { email },
-    select: { id: true, email: true, username: true, name: true, password: true, role: true, isVerified: true, createdAt: true }
+    select: { id: true, email: true, username: true, name: true, password: true, role: true, createdAt: true }
   })
 
   if (!user) {
@@ -172,15 +220,11 @@ const login = asyncHandler(async (req, res) => {
     return ApiResponse.unauthorized(res, 'Invalid email or password')
   }
 
-  if (!user.isVerified) {
-    return ApiResponse.error(res, 'Please verify your email before logging in. Check your inbox for the verification link.', 403)
-  }
-
   const token = generateToken({ userId: user.id, role: user.role })
-  const { password: _, isVerified: __, ...userWithoutSensitiveFields } = user
+  const { password: _, ...userWithoutPassword } = user
 
   res.cookie('token', token, cookieOptions)
-  ApiResponse.success(res, { user: userWithoutSensitiveFields }, 'Login successful')
+  ApiResponse.success(res, { user: userWithoutPassword }, 'Login successful')
 })
 
 // POST /api/v1/auth/logout

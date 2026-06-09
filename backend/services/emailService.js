@@ -2,12 +2,19 @@ const nodemailer = require('nodemailer')
 const config = require('../config/config')
 
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true,
   auth: {
     user: config.EMAIL_USER,
     pass: config.EMAIL_PASS,
   },
 })
+
+const verifyTransporter = async () => {
+  await transporter.verify()
+  console.log('✅ Email transporter ready')
+}
 
 const sendVerificationEmail = async (email, name, token) => {
   const url = `${config.FRONTEND_URL}/verify-email?token=${token}`
@@ -47,4 +54,4 @@ const sendPasswordResetEmail = async (email, name, token) => {
   })
 }
 
-module.exports = { sendVerificationEmail, sendPasswordResetEmail }
+module.exports = { verifyTransporter, sendVerificationEmail, sendPasswordResetEmail }

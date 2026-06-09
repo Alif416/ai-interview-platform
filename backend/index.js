@@ -7,6 +7,7 @@ const config = require('./config/config')
 const { connectDB } = require('./config/database')
 const { connectRedis, disconnectRedis } = require('./config/redis')
 const { setupRoomHandlers } = require('./sockets/roomHandler')
+const { verifyTransporter } = require('./services/emailService')
 
 const server = http.createServer(app)
 
@@ -31,7 +32,14 @@ const YJS_PORT = Number(config.PORT) + 1
 const wss = new WebSocketServer({ port: YJS_PORT })
 wss.on('connection', setupWSConnection)
 
-Promise.all([connectDB(), connectRedis()]).then(() => {
+Promise.all([connectDB(), connectRedis()]).then(async () => {
+  try {
+    await verifyTransporter()
+  } catch (err) {
+    console.error('❌ Email transporter failed:', err.message)
+    console.error('   Check EMAIL_USER and EMAIL_PASS in .env — emails will not send until this is fixed.')
+  }
+
   server.listen(config.PORT, () => {
     console.log(`Server running on http://localhost:${config.PORT}`)
     console.log(`Environment: ${config.NODE_ENV}`)
