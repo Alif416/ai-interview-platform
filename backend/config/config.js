@@ -10,8 +10,8 @@ const config = {
   COOKIE_MAX_AGE: 7 * 24 * 60 * 60 * 1000,
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
   REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
-  RESEND_API_KEY: process.env.RESEND_API_KEY,
-  EMAIL_FROM: process.env.EMAIL_FROM || 'onboarding@resend.dev',
+  BREVO_API_KEY: process.env.BREVO_API_KEY,
+  EMAIL_FROM: process.env.EMAIL_FROM || 'labibalif2001@gmail.com',
   FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:5173'
 }
 
