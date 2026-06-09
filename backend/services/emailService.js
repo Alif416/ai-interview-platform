@@ -1,15 +1,41 @@
 const nodemailer = require('nodemailer')
+const { Resolver } = require('dns').promises
 const config = require('../config/config')
 
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
   port: 465,
   secure: true,
+  connectionTimeout: 10000,
+  socketTimeout: 10000,
   auth: {
     user: config.EMAIL_USER,
     pass: config.EMAIL_PASS,
   },
 })
+
+const resolver = new Resolver()
+resolver.setServers(['8.8.8.8', '1.1.1.1'])
+
+// Returns false only when we can positively confirm the domain has no mail servers.
+// Fails open on network/DNS errors so legitimate users aren't blocked by a DNS outage.
+const validateEmailDomain = async (email) => {
+  const domain = email.split('@')[1]
+  try {
+    const records = await Promise.race([
+      resolver.resolveMx(domain),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('dns_timeout')), 5000)),
+    ])
+    return Array.isArray(records) && records.length > 0
+  } catch (err) {
+    // ENOTFOUND / ENODATA = domain has no MX records → definitely invalid
+    if (err.code === 'ENOTFOUND' || err.code === 'ENODATA' || err.code === 'ESERVFAIL') {
+      return false
+    }
+    // Network/timeout issues → fail open, let the send attempt surface the real error
+    return true
+  }
+}
 
 const verifyTransporter = async () => {
   await transporter.verify()
@@ -54,4 +80,4 @@ const sendPasswordResetEmail = async (email, name, token) => {
   })
 }
 
-module.exports = { verifyTransporter, sendVerificationEmail, sendPasswordResetEmail }
+module.exports = { verifyTransporter, validateEmailDomain, sendVerificationEmail, sendPasswordResetEmail }

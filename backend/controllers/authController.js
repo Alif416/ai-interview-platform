@@ -6,7 +6,7 @@ const { generateToken } = require('../utils/jwt')
 const ApiResponse = require('../utils/apiResponse')
 const asyncHandler = require('../middleware/asyncHandler')
 const config = require('../config/config')
-const { sendVerificationEmail, sendPasswordResetEmail } = require('../services/emailService')
+const { sendVerificationEmail, sendPasswordResetEmail, validateEmailDomain } = require('../services/emailService')
 
 const PENDING_TTL = 24 * 60 * 60 // 24 hours in seconds
 
@@ -21,6 +21,12 @@ const cookieOptions = {
 const register = asyncHandler(async (req, res) => {
   const { name, username, email, password, role } = req.body
   const redis = getRedis()
+
+  // Reject emails with non-existent domains before doing anything else
+  const domainValid = await validateEmailDomain(email)
+  if (!domainValid) {
+    return ApiResponse.badRequest(res, 'Email address is invalid or does not exist')
+  }
 
   // Check DB for already-verified accounts
   const [existingEmail, existingUsername] = await Promise.all([
