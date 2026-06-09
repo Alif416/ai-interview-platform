@@ -28,6 +28,8 @@ A full-stack technical interview preparation platform featuring AI-powered mock 
 | Socket.IO Client | Live room events (join, chat, code sync) |
 | Axios | HTTP client |
 
+
+---N
 ### Backend
 | Tech | Purpose |
 |---|---|
