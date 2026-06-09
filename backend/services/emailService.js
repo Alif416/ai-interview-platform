@@ -1,19 +1,8 @@
-const nodemailer = require('nodemailer')
+const { Resend } = require('resend')
 const { Resolver } = require('dns').promises
 const config = require('../config/config')
 
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false,
-  requireTLS: true,
-  connectionTimeout: 10000,
-  socketTimeout: 10000,
-  auth: {
-    user: config.EMAIL_USER,
-    pass: config.EMAIL_PASS,
-  },
-})
+const resend = new Resend(config.RESEND_API_KEY)
 
 const resolver = new Resolver()
 resolver.setServers(['8.8.8.8', '1.1.1.1'])
@@ -29,25 +18,25 @@ const validateEmailDomain = async (email) => {
     ])
     return Array.isArray(records) && records.length > 0
   } catch (err) {
-    // ENOTFOUND / ENODATA = domain has no MX records → definitely invalid
     if (err.code === 'ENOTFOUND' || err.code === 'ENODATA' || err.code === 'ESERVFAIL') {
       return false
     }
-    // Network/timeout issues → fail open, let the send attempt surface the real error
     return true
   }
 }
 
 const verifyTransporter = async () => {
-  await transporter.verify()
-  console.log('✅ Email transporter ready')
+  if (!config.RESEND_API_KEY || config.RESEND_API_KEY === 're_your_api_key_here') {
+    throw new Error('RESEND_API_KEY is not set in .env')
+  }
+  console.log('✅ Email service (Resend) ready')
 }
 
 const sendVerificationEmail = async (email, name, token) => {
   const url = `${config.FRONTEND_URL}/verify-email?token=${token}`
 
-  await transporter.sendMail({
-    from: `"LevelUp.io" <${config.EMAIL_USER}>`,
+  const { error } = await resend.emails.send({
+    from: `LevelUp.io <${config.EMAIL_FROM}>`,
     to: email,
     subject: 'Verify your email — LevelUp.io',
     html: `
@@ -60,13 +49,15 @@ const sendVerificationEmail = async (email, name, token) => {
       </div>
     `,
   })
+
+  if (error) throw new Error(error.message)
 }
 
 const sendPasswordResetEmail = async (email, name, token) => {
   const url = `${config.FRONTEND_URL}/reset-password?token=${token}`
 
-  await transporter.sendMail({
-    from: `"LevelUp.io" <${config.EMAIL_USER}>`,
+  const { error } = await resend.emails.send({
+    from: `LevelUp.io <${config.EMAIL_FROM}>`,
     to: email,
     subject: 'Reset your password — LevelUp.io',
     html: `
@@ -79,6 +70,8 @@ const sendPasswordResetEmail = async (email, name, token) => {
       </div>
     `,
   })
+
+  if (error) throw new Error(error.message)
 }
 
 module.exports = { verifyTransporter, validateEmailDomain, sendVerificationEmail, sendPasswordResetEmail }
