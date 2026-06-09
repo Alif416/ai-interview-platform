@@ -81,12 +81,12 @@ const loginLimiter = createLimiter({
   message: 'Too many login attempts. You can try again in 15 minutes.',
 })
 
-// 10 req / hour per IP — spam guard on register
+// 10 req / 2 min per IP — spam guard on register
 const registerLimiter = createLimiter({
   max: 10,
-  windowSecs: 60 * 60,
+  windowSecs: 2 * 60,
   keyFn: (req) => `register:${req.ip}`,
-  message: 'Too many registration attempts. You can try again in 1 hour.',
+  message: 'Too many registration attempts. You can try again in 2 minutes.',
 })
 
 // 3 req / hour per IP — prevent email bombing on forgot-password
