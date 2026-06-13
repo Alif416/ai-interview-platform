@@ -85,6 +85,17 @@ const resetPasswordSchema = z.object({
     .max(100, 'Password too long')
 })
 
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Current password is required'),
+  newPassword: z.string()
+    .min(6, 'Password must be at least 6 characters')
+    .max(100, 'Password too long'),
+})
+
+const deleteAccountSchema = z.object({
+  password: z.string().min(1, 'Password is required'),
+})
+
 module.exports = {
   registerSchema,
   loginSchema,
@@ -92,5 +103,7 @@ module.exports = {
   resetPasswordSchema,
   createSessionSchema,
   updateSessionSchema,
-  sessionQuerySchema
+  sessionQuerySchema,
+  changePasswordSchema,
+  deleteAccountSchema,
 }

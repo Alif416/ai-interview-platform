@@ -244,4 +244,40 @@ const getMe = asyncHandler(async (req, res) => {
   ApiResponse.success(res, req.user, 'User retrieved successfully')
 })
 
-module.exports = { register, login, logout, verifyEmail, resendVerification, forgotPassword, resetPassword, getMe }
+// PUT /api/v1/auth/change-password
+const changePassword = asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword } = req.body
+
+  const user = await prisma.user.findUnique({ where: { id: req.user.id } })
+  if (!user) return ApiResponse.notFound(res, 'User not found')
+
+  const isValid = await bcrypt.compare(currentPassword, user.password)
+  if (!isValid) return ApiResponse.badRequest(res, 'Current password is incorrect')
+
+  const hashed = await bcrypt.hash(newPassword, 10)
+  await prisma.user.update({ where: { id: user.id }, data: { password: hashed } })
+
+  ApiResponse.success(res, null, 'Password changed successfully')
+})
+
+// DELETE /api/v1/auth/delete-account
+const deleteAccount = asyncHandler(async (req, res) => {
+  const { password } = req.body
+
+  const user = await prisma.user.findUnique({ where: { id: req.user.id } })
+  if (!user) return ApiResponse.notFound(res, 'User not found')
+
+  const isValid = await bcrypt.compare(password, user.password)
+  if (!isValid) return ApiResponse.badRequest(res, 'Password is incorrect')
+
+  await prisma.user.delete({ where: { id: user.id } })
+
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: config.NODE_ENV === 'production',
+    sameSite: config.NODE_ENV === 'production' ? 'none' : 'lax',
+  })
+  ApiResponse.success(res, null, 'Account deleted successfully')
+})
+
+module.exports = { register, login, logout, verifyEmail, resendVerification, forgotPassword, resetPassword, getMe, changePassword, deleteAccount }
