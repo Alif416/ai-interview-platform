@@ -711,6 +711,7 @@ export default function LiveInterviewRoom() {
     const s = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000', {
       withCredentials: true,
       transports: ['polling', 'websocket'],
+      auth: { token: localStorage.getItem('token') },
     })
     socketRef.current = s
 

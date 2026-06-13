@@ -9,6 +9,13 @@ const api = axios.create({
   withCredentials: true
 })
 
+// REQUEST interceptor — attach token from localStorage as Bearer header
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token')
+  if (token) config.headers.Authorization = `Bearer ${token}`
+  return config
+})
+
 // RESPONSE interceptor — auto-redirect on expired/invalid token
 api.interceptors.response.use(
   (response) => response,

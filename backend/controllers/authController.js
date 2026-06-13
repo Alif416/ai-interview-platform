@@ -74,8 +74,8 @@ const register = asyncHandler(async (req, res) => {
       redis.del(`pending:email:${email}`),
       redis.del(`pending:username:${username}`),
     ])
-    console.error('Verification email failed:', err.message, err.response?.data)
-    return ApiResponse.error(res, `Email failed: ${err.message} — ${JSON.stringify(err.response?.data)}`, 500)
+    console.error('Verification email failed:', err.message)
+    return ApiResponse.error(res, 'Failed to send verification email. Please try again later.', 500)
   }
 
   ApiResponse.created(res, { email }, 'Registration successful. Please check your email to verify your account.')
@@ -230,7 +230,7 @@ const login = asyncHandler(async (req, res) => {
   const { password: _, ...userWithoutPassword } = user
 
   res.cookie('token', token, cookieOptions)
-  ApiResponse.success(res, { user: userWithoutPassword }, 'Login successful')
+  ApiResponse.success(res, { user: userWithoutPassword, token }, 'Login successful')
 })
 
 // POST /api/v1/auth/logout

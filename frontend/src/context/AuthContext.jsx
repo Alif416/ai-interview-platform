@@ -24,10 +24,10 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const { data } = await api.post('/auth/login', { email, password })
-    const { user } = data.data
+    const { user, token } = data.data
 
-    // Token is set as httpOnly cookie by the server — we only store user profile
     if (user) localStorage.setItem('user', JSON.stringify(user))
+    if (token) localStorage.setItem('token', token)
     setUser(user)
 
     return user
@@ -42,12 +42,12 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     try {
-      // Ask server to clear the httpOnly cookie
       await api.post('/auth/logout')
     } catch {
       // Continue with client-side cleanup even if server call fails
     }
     localStorage.removeItem('user')
+    localStorage.removeItem('token')
     setUser(null)
   }
 
