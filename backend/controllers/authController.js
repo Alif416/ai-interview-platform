@@ -13,7 +13,7 @@ const PENDING_TTL = 24 * 60 * 60 // 24 hours in seconds
 const cookieOptions = {
   httpOnly: true,
   secure: config.NODE_ENV === 'production',
-  sameSite: 'lax',
+  sameSite: config.NODE_ENV === 'production' ? 'none' : 'lax',
   maxAge: config.COOKIE_MAX_AGE,
 }
 
@@ -235,7 +235,7 @@ const login = asyncHandler(async (req, res) => {
 
 // POST /api/v1/auth/logout
 const logout = asyncHandler(async (req, res) => {
-  res.clearCookie('token', { httpOnly: true, sameSite: 'lax', secure: config.NODE_ENV === 'production' })
+  res.clearCookie('token', { httpOnly: true, secure: config.NODE_ENV === 'production', sameSite: config.NODE_ENV === 'production' ? 'none' : 'lax' })
   ApiResponse.success(res, null, 'Logged out successfully')
 })
 
