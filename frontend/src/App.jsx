@@ -9,6 +9,7 @@ import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import Dashboard from './pages/Dashboard'
 import LiveInterviewRoom from './pages/LiveInterviewRoom'
+import Profile from './pages/Profile'
 
 function RootRedirect() {
   const { isAuthenticated } = useAuth()
@@ -44,6 +45,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <LiveInterviewRoom />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Profile />
               </ProtectedRoute>
             }
           />

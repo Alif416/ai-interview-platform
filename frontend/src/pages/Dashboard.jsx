@@ -785,12 +785,19 @@ export default function Dashboard() {
           <span className="hidden md:block text-xs" style={{ color: 'var(--lc-text-2)' }}>
             {user?.name}
           </span>
-          <div
-            className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold select-none"
-            style={{ backgroundColor: 'var(--lc-orange-dim)', color: 'var(--lc-orange)', border: '1px solid rgba(255,161,22,0.3)' }}
+          <button
+            onClick={() => navigate('/profile')}
+            title="View profile"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold select-none transition-opacity hover:opacity-80"
+            style={{
+              backgroundColor: 'var(--lc-orange-dim)',
+              color: 'var(--lc-orange)',
+              border: '1px solid rgba(255,161,22,0.3)',
+              cursor: 'pointer',
+            }}
           >
             {initials}
-          </div>
+          </button>
           <button
             onClick={logout}
             className="lc-btn-ghost text-xs"
