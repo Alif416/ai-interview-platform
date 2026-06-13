@@ -671,8 +671,8 @@ export default function LiveInterviewRoom() {
     if (problemList.length > 0) return
     setProblemsLoading(true)
     try {
-      const res = await api.get('/problems')
-      setProblemList(res.data.data)
+      const res = await api.get('/problems?limit=100')
+      setProblemList(res.data.data?.problems ?? [])
     } catch (e) {
       console.error('Failed to load problems:', e)
     } finally {
