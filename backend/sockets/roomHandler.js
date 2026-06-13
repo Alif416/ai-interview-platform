@@ -20,7 +20,8 @@ function getOrCreateRoom(sessionId) {
 function setupRoomHandlers(io) {
   io.use(async (socket, next) => {
     try {
-      const token = socket.handshake.auth.token
+      const cookieHeader = socket.handshake.headers.cookie || ''
+      const token = cookieHeader.split(';').map(c => c.trim()).find(c => c.startsWith('token='))?.split('=')[1]
       if (!token) return next(new Error('Authentication required'))
 
       const decoded = verifyToken(token)
