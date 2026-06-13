@@ -1,6 +1,22 @@
-# LevelUp.io
+<div align="center">
 
-A full-stack technical interview preparation platform featuring AI-powered mock interviews, invite-only live coding rooms with real-time collaboration, a curated NeetCode 250 problem set, and a user profile management system — all wrapped in a LeetCode-inspired dark UI.
+# 🚀 LevelUp.io — Intelligent Interview Preparation Platform
+
+![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=white)
+![Express](https://img.shields.io/badge/Express-5-000000?style=for-the-badge&logo=express&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Prisma-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
+![Socket.IO](https://img.shields.io/badge/Socket.IO-Real--Time-010101?style=for-the-badge&logo=socket.io&logoColor=white)
+![Claude AI](https://img.shields.io/badge/Claude-AI%20Powered-D97706?style=for-the-badge&logo=anthropic&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-10B981?style=for-the-badge)
+
+**Enterprise-grade technical interview platform powered by AI.**  
+Real-time collaborative coding, AI-scored mock interviews, and 250+ curated problems — all in one place.
+
+🌐 **[Live Demo](https://ai-interview-platform-sandy-one.vercel.app/)**
+
+[Features](#features) · [Quick Start](#getting-started) · [API Reference](#api-reference) · [Architecture](#project-structure) · [Dataset](#database-schema)
+
+</div>
 
 ---
 
