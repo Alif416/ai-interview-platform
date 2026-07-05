@@ -16,12 +16,24 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// RESPONSE interceptor — auto-redirect on expired/invalid token
+// Endpoints where a 401 is a normal "bad credentials / not logged in" result,
+// NOT an expired session. These must be allowed to reject so the calling page
+// can show its own error message instead of triggering a redirect.
+const AUTH_ENDPOINTS = ['/auth/login', '/auth/register', '/auth/forgot-password', '/auth/reset-password']
+
+// RESPONSE interceptor — auto-redirect only when an authenticated session expires
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const url = error.config?.url || ''
+    const isAuthRequest = AUTH_ENDPOINTS.some((endpoint) => url.includes(endpoint))
+    const onLoginPage = window.location.pathname === '/login'
+
+    // Only force a redirect for a 401 on a *protected* request (expired/invalid
+    // token) — never for the login attempt itself, and never if already on /login.
+    if (error.response?.status === 401 && !isAuthRequest && !onLoginPage) {
       localStorage.removeItem('user')
+      localStorage.removeItem('token')
       window.location.href = '/login'
     }
     return Promise.reject(error)

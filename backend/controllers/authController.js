@@ -74,7 +74,7 @@ const register = asyncHandler(async (req, res) => {
       redis.del(`pending:email:${email}`),
       redis.del(`pending:username:${username}`),
     ])
-    console.error('Verification email failed:', err.message)
+    console.error('Verification email failed:', err.response?.status, err.response?.data || err.message)
     return ApiResponse.error(res, 'Failed to send verification email. Please try again later.', 500)
   }
 
