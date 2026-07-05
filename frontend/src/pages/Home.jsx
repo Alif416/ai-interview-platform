@@ -18,8 +18,6 @@ const FEATURES = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
       </svg>
     ),
-    color: '#ffa116',
-    bg: 'rgba(255,161,22,0.1)',
     title: 'AI-Powered Interviews',
     desc: 'Practice with an intelligent AI interviewer that evaluates your answers in real time, giving you detailed feedback on clarity, depth, and technical accuracy.',
   },
@@ -29,8 +27,6 @@ const FEATURES = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 10l4.553-2.069A1 1 0 0121 8.882V15.118a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
       </svg>
     ),
-    color: '#00b8a3',
-    bg: 'rgba(0,184,163,0.1)',
     title: 'Live Interview Rooms',
     desc: 'Interviewers invite candidates directly by username. Collaborate in real time with a shared Monaco editor, live chat, and instant code execution.',
   },
@@ -40,8 +36,6 @@ const FEATURES = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
       </svg>
     ),
-    color: '#60a5fa',
-    bg: 'rgba(96,165,250,0.1)',
     title: '250+ Curated Problems',
     desc: 'Work through a hand-picked set of problems across arrays, trees, graphs, DP and more — tagged by topic and difficulty, pulled straight from the NeetCode 250.',
   },
@@ -51,8 +45,6 @@ const FEATURES = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
       </svg>
     ),
-    color: '#a78bfa',
-    bg: 'rgba(167,139,250,0.1)',
     title: 'Performance Analytics',
     desc: 'Track your scores, grades, and improvement across every AI session. See your strengths and weakest topics at a glance with visual performance charts.',
   },
@@ -77,10 +69,9 @@ const STEPS = [
 ]
 
 const STATS = [
-  { value: '250+', label: 'Curated Problems' },
-  { value: '8',    label: 'Languages Supported' },
-  { value: 'AI',   label: 'Powered Feedback' },
-  { value: '∞',    label: 'Practice Sessions' },
+  { value: '250+', label: 'Curated problems' },
+  { value: '8',    label: 'Languages supported' },
+  { value: 'Live', label: 'Collaborative rooms' },
 ]
 
 const CODE_LINES = [
@@ -115,13 +106,7 @@ function CodeMockup() {
         <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#febc2e' }} />
         <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#28c840' }} />
         <span className="ml-3 text-xs" style={{ color: '#808080' }}>solution.js</span>
-        <span className="ml-auto flex items-center gap-1.5 text-xs" style={{ color: '#00b8a3' }}>
-          <span className="relative flex w-1.5 h-1.5">
-            <span className="absolute inline-flex h-full w-full rounded-full opacity-75 animate-ping" style={{ backgroundColor: '#00b8a3' }} />
-            <span className="relative w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#00b8a3' }} />
-          </span>
-          Live
-        </span>
+        <span className="ml-auto text-xs" style={{ color: '#808080' }}>JavaScript</span>
       </div>
 
       {/* Code */}
@@ -158,47 +143,19 @@ export default function Home() {
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--lc-bg)', color: 'var(--lc-text)' }}>
       <style>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-10px); }
-        }
         @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(20px); }
+          from { opacity: 0; transform: translateY(12px); }
           to   { opacity: 1; transform: translateY(0); }
         }
-        @keyframes gradientShift {
-          0%   { background-position: 0% 50%; }
-          50%  { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
+        @media (prefers-reduced-motion: no-preference) {
+          .hero-title { animation: fadeUp 0.5s ease both; }
+          .hero-sub   { animation: fadeUp 0.5s ease 0.08s both; }
+          .hero-cta   { animation: fadeUp 0.5s ease 0.16s both; }
+          .hero-code  { animation: fadeUp 0.5s ease 0.1s both; }
         }
-        .hero-title {
-          animation: fadeUp 0.7s ease both;
-        }
-        .hero-sub {
-          animation: fadeUp 0.7s ease 0.15s both;
-        }
-        .hero-cta {
-          animation: fadeUp 0.7s ease 0.28s both;
-        }
-        .hero-code {
-          animation: fadeUp 0.7s ease 0.1s both, float 5s ease-in-out 1s infinite;
-        }
-        .gradient-text {
-          background: linear-gradient(135deg, #ffa116 0%, #ff375f 50%, #a78bfa 100%);
-          background-size: 200% 200%;
-          animation: gradientShift 4s ease infinite;
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
-        }
-        .feature-card:hover {
-          transform: translateY(-3px);
-          border-color: rgba(255,161,22,0.25) !important;
-        }
-        .feature-card { transition: transform 0.2s ease, border-color 0.2s ease; }
-        .glow-orange {
-          box-shadow: 0 0 60px rgba(255,161,22,0.08), 0 0 120px rgba(255,161,22,0.04);
-        }
+        .accent-text { color: var(--lc-orange); }
+        .feature-card { transition: border-color 0.15s ease; }
+        .feature-card:hover { border-color: var(--lc-border-2) !important; }
       `}</style>
 
       {/* ── Navbar ─────────────────────────────────────────────────── */}
@@ -247,51 +204,19 @@ export default function Home() {
       </nav>
 
       {/* ── Hero ───────────────────────────────────────────────────── */}
-      <section className="relative flex-1 flex items-center overflow-hidden" style={{ minHeight: '88vh' }}>
-
-        {/* Background grid */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            backgroundImage: 'linear-gradient(rgba(60,60,60,0.25) 1px, transparent 1px), linear-gradient(90deg, rgba(60,60,60,0.25) 1px, transparent 1px)',
-            backgroundSize: '48px 48px',
-            maskImage: 'radial-gradient(ellipse 80% 60% at 50% 50%, black 30%, transparent 100%)',
-          }}
-        />
-
-        {/* Orange glow */}
-        <div
-          className="absolute pointer-events-none"
-          style={{
-            width: '600px', height: '600px',
-            background: 'radial-gradient(circle, rgba(255,161,22,0.07) 0%, transparent 70%)',
-            top: '50%', left: '50%',
-            transform: 'translate(-50%, -50%)',
-          }}
-        />
+      <section className="relative flex-1 flex items-center" style={{ minHeight: '80vh' }}>
 
         <div className="relative w-full max-w-7xl mx-auto px-6 sm:px-10 py-24 grid lg:grid-cols-2 gap-16 items-center">
 
           {/* Left: text */}
           <div className="flex flex-col gap-7">
-            <div
-              className="hero-title inline-flex items-center gap-2 self-start px-3 py-1.5 rounded-full border text-xs font-medium"
-              style={{ backgroundColor: 'rgba(255,161,22,0.08)', borderColor: 'rgba(255,161,22,0.25)', color: 'var(--lc-orange)' }}
-            >
-              <span className="relative flex w-1.5 h-1.5">
-                <span className="absolute inline-flex h-full w-full rounded-full opacity-75 animate-ping" style={{ backgroundColor: 'var(--lc-orange)' }} />
-                <span className="relative w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--lc-orange)' }} />
-              </span>
-              Real-time AI coding interviews
-            </div>
-
             <h1
               className="hero-title text-5xl sm:text-6xl font-extrabold leading-tight tracking-tight"
               style={{ color: 'var(--lc-text)', letterSpacing: '-0.02em' }}
             >
               Ace your next
               <br />
-              <span className="gradient-text">technical interview</span>
+              <span className="accent-text">technical interview</span>
             </h1>
 
             <p className="hero-sub text-base leading-relaxed max-w-lg" style={{ color: 'var(--lc-text-3)' }}>
@@ -322,48 +247,8 @@ export default function Home() {
           </div>
 
           {/* Right: code mockup */}
-          <div className="hero-code hidden lg:block glow-orange">
+          <div className="hero-code hidden lg:block">
             <CodeMockup />
-
-            {/* Floating participant badge */}
-            <div
-              className="absolute -bottom-4 -left-6 flex items-center gap-2.5 px-4 py-2.5 rounded-xl border shadow-xl"
-              style={{ backgroundColor: '#282828', borderColor: '#3c3c3c' }}
-            >
-              <div className="flex -space-x-2">
-                {['#ffa116', '#00b8a3', '#60a5fa'].map((c, i) => (
-                  <div key={i} className="w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-bold"
-                    style={{ backgroundColor: `${c}22`, color: c, borderColor: '#282828' }}>
-                    {['A', 'B', 'C'][i]}
-                  </div>
-                ))}
-              </div>
-              <div>
-                <p className="text-xs font-medium" style={{ color: 'var(--lc-text)' }}>2 participants</p>
-                <p className="text-xs" style={{ color: 'var(--lc-muted)' }}>Live session</p>
-              </div>
-              <span className="relative flex w-1.5 h-1.5 ml-1">
-                <span className="absolute inline-flex h-full w-full rounded-full opacity-75 animate-ping" style={{ backgroundColor: '#00b8a3' }} />
-                <span className="relative w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#00b8a3' }} />
-              </span>
-            </div>
-
-            {/* Floating AI feedback badge */}
-            <div
-              className="absolute -top-4 -right-6 flex items-center gap-2.5 px-4 py-2.5 rounded-xl border shadow-xl"
-              style={{ backgroundColor: '#282828', borderColor: '#3c3c3c' }}
-            >
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center"
-                style={{ backgroundColor: 'rgba(167,139,250,0.15)' }}>
-                <svg className="w-4 h-4" style={{ color: '#a78bfa' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-xs font-medium" style={{ color: 'var(--lc-text)' }}>AI Score: 92/100</p>
-                <p className="text-xs" style={{ color: '#a78bfa' }}>Excellent</p>
-              </div>
-            </div>
           </div>
         </div>
       </section>
@@ -379,7 +264,7 @@ export default function Home() {
             <h2 className="text-4xl font-extrabold tracking-tight mb-4" style={{ color: 'var(--lc-text)' }}>
               Everything you need to
               <br />
-              <span className="gradient-text">land the job</span>
+              <span className="accent-text">land the job</span>
             </h2>
             <p className="text-sm max-w-md mx-auto" style={{ color: 'var(--lc-text-3)' }}>
               From AI-powered mock interviews to real-time live sessions — one platform, end to end.
@@ -393,8 +278,8 @@ export default function Home() {
                 className="feature-card rounded-2xl border p-6 flex flex-col gap-4"
                 style={{ backgroundColor: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}
               >
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
-                  style={{ backgroundColor: f.bg, color: f.color }}>
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border"
+                  style={{ backgroundColor: 'var(--lc-surface-2)', borderColor: 'var(--lc-border)', color: 'var(--lc-text-2)' }}>
                   {f.icon}
                 </div>
                 <div>
@@ -417,7 +302,7 @@ export default function Home() {
             </p>
             <h2 className="text-4xl font-extrabold tracking-tight" style={{ color: 'var(--lc-text)' }}>
               Up and running in{' '}
-              <span className="gradient-text">minutes</span>
+              <span className="accent-text">minutes</span>
             </h2>
           </div>
 
