@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🚀 LevelUp.io — Intelligent Interview Preparation Platform
+#  LevelUp.io — Intelligent Interview Preparation Platform
 
 ![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=white)
 ![Express](https://img.shields.io/badge/Express-5-000000?style=for-the-badge&logo=express&logoColor=white)
