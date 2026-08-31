@@ -2,21 +2,36 @@ const BaseRepository = require('./BaseRepository')
 const { NotFoundError } = require('../core/errors')
 
 class PerformanceRepository extends BaseRepository {
-  constructor(prisma) {
-    super(prisma, prisma.aIEvaluation)
-    this.prisma = prisma
+  constructor(pool) {
+    super(pool)
   }
 
   async createEvaluation(evaluationData) {
-    return await this.prisma.aIEvaluation.create({
-      data: evaluationData
-    })
+    const sql = `
+      INSERT INTO "AIEvaluation"
+      ("userId", question, answer, role, level, topic, score, grade, strengths, improvements, "idealAnswer", "createdAt")
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
+      RETURNING *
+    `
+
+    return await this.queryOne(sql, [
+      evaluationData.userId,
+      evaluationData.question,
+      evaluationData.answer,
+      evaluationData.role,
+      evaluationData.level,
+      evaluationData.topic,
+      evaluationData.score,
+      evaluationData.grade,
+      evaluationData.strengths || [],
+      evaluationData.improvements || [],
+      evaluationData.idealAnswer
+    ])
   }
 
   async findEvaluationById(id) {
-    const evaluation = await this.prisma.aIEvaluation.findUnique({
-      where: { id }
-    })
+    const sql = 'SELECT * FROM "AIEvaluation" WHERE id = $1'
+    const evaluation = await this.queryOne(sql, [id])
 
     if (!evaluation) {
       throw new NotFoundError('Evaluation')
@@ -26,23 +41,31 @@ class PerformanceRepository extends BaseRepository {
   }
 
   async findUserEvaluations(userId) {
-    return await this.prisma.aIEvaluation.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' }
-    })
+    const sql = `
+      SELECT * FROM "AIEvaluation"
+      WHERE "userId" = $1
+      ORDER BY "createdAt" DESC
+    `
+    return await this.queryMany(sql, [userId])
   }
 
   async findUserEvaluationsByTopic(userId, topic) {
-    return await this.prisma.aIEvaluation.findMany({
-      where: { userId, topic },
-      orderBy: { createdAt: 'desc' }
-    })
+    const sql = `
+      SELECT * FROM "AIEvaluation"
+      WHERE "userId" = $1 AND topic = $2
+      ORDER BY "createdAt" DESC
+    `
+    return await this.queryMany(sql, [userId, topic])
   }
 
   async getUserPerformanceStats(userId) {
-    const evaluations = await this.prisma.aIEvaluation.findMany({
-      where: { userId }
-    })
+    // Get all evaluations for the user
+    const evaluationsSql = `
+      SELECT * FROM "AIEvaluation"
+      WHERE "userId" = $1
+      ORDER BY "createdAt" DESC
+    `
+    const evaluations = await this.queryMany(evaluationsSql, [userId])
 
     if (evaluations.length === 0) {
       return {
@@ -54,6 +77,7 @@ class PerformanceRepository extends BaseRepository {
       }
     }
 
+    // Calculate stats
     const byTopic = {}
     let totalScore = 0
 
@@ -83,30 +107,28 @@ class PerformanceRepository extends BaseRepository {
   }
 
   async getTopicPerformance(userId) {
-    const evaluations = await this.prisma.aIEvaluation.findMany({
-      where: { userId },
-      select: { topic: true, score: true, grade: true }
-    })
+    const sql = `
+      SELECT
+        topic,
+        COUNT(*) as count,
+        ROUND(AVG(score)::numeric, 2) as average,
+        MIN(score) as min,
+        MAX(score) as max
+      FROM "AIEvaluation"
+      WHERE "userId" = $1
+      GROUP BY topic
+      ORDER BY average DESC
+    `
 
-    const stats = {}
-
-    evaluations.forEach(eval => {
-      if (!stats[eval.topic]) {
-        stats[eval.topic] = { scores: [], grades: [] }
-      }
-      stats[eval.topic].scores.push(eval.score)
-      stats[eval.topic].grades.push(eval.grade)
-    })
+    const results = await this.queryMany(sql, [userId])
 
     const result = {}
-
-    Object.keys(stats).forEach(topic => {
-      const scores = stats[topic].scores
-      result[topic] = {
-        count: scores.length,
-        average: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length),
-        min: Math.min(...scores),
-        max: Math.max(...scores)
+    results.forEach(row => {
+      result[row.topic] = {
+        count: parseInt(row.count),
+        average: parseFloat(row.average),
+        min: parseFloat(row.min),
+        max: parseFloat(row.max)
       }
     })
 
@@ -114,9 +136,8 @@ class PerformanceRepository extends BaseRepository {
   }
 
   async deleteEvaluation(id) {
-    return await this.prisma.aIEvaluation.delete({
-      where: { id }
-    })
+    const sql = 'DELETE FROM "AIEvaluation" WHERE id = $1 RETURNING *'
+    return await this.queryOne(sql, [id])
   }
 }
 

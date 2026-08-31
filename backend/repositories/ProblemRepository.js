@@ -2,15 +2,13 @@ const BaseRepository = require('./BaseRepository')
 const { NotFoundError } = require('../core/errors')
 
 class ProblemRepository extends BaseRepository {
-  constructor(prisma) {
-    super(prisma, prisma.problem)
-    this.prisma = prisma
+  constructor(pool) {
+    super(pool)
   }
 
   async findProblemById(id) {
-    const problem = await this.prisma.problem.findUnique({
-      where: { id }
-    })
+    const sql = 'SELECT * FROM "Problem" WHERE id = $1'
+    const problem = await this.queryOne(sql, [id])
 
     if (!problem) {
       throw new NotFoundError('Problem')
@@ -20,9 +18,8 @@ class ProblemRepository extends BaseRepository {
   }
 
   async findProblemBySlug(slug) {
-    const problem = await this.prisma.problem.findUnique({
-      where: { slug }
-    })
+    const sql = 'SELECT * FROM "Problem" WHERE slug = $1'
+    const problem = await this.queryOne(sql, [slug])
 
     if (!problem) {
       throw new NotFoundError('Problem')
@@ -34,73 +31,109 @@ class ProblemRepository extends BaseRepository {
   async findAllProblems(filters = {}) {
     const { difficulty, tag, search, skip = 0, take = 20 } = filters
 
-    const where = {}
+    let whereConditions = []
+    let params = []
+    let paramCount = 1
 
+    // Build WHERE clause dynamically
     if (difficulty) {
-      where.difficulty = difficulty
+      whereConditions.push(`difficulty = $${paramCount++}`)
+      params.push(difficulty)
     }
 
     if (tag) {
-      where.tags = { hasSome: [tag] }
+      whereConditions.push(`$${paramCount++} = ANY(tags)`)
+      params.push(tag)
     }
 
     if (search) {
-      where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } }
-      ]
+      const searchPattern = `%${search}%`
+      whereConditions.push(
+        `(title ILIKE $${paramCount} OR description ILIKE $${paramCount + 1})`
+      )
+      params.push(searchPattern, searchPattern)
+      paramCount += 2
     }
 
-    const [problems, total] = await Promise.all([
-      this.prisma.problem.findMany({
-        where,
-        skip,
-        take,
-        orderBy: { createdAt: 'desc' }
-      }),
-      this.prisma.problem.count({ where })
+    const whereClause = whereConditions.length > 0
+      ? `WHERE ${whereConditions.join(' AND ')}`
+      : ''
+
+    // Get total count
+    const countSql = `SELECT COUNT(*) as total FROM "Problem" ${whereClause}`
+    const countResult = await this.queryOne(countSql, params)
+    const total = parseInt(countResult.total)
+
+    // Get paginated results
+    const problemsSql = `
+      SELECT * FROM "Problem"
+      ${whereClause}
+      ORDER BY "createdAt" DESC
+      LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
+    `
+
+    const problems = await this.queryMany(problemsSql, [
+      ...params,
+      take,
+      skip
     ])
 
     return { problems, total }
   }
 
   async findProblemsByDifficulty(difficulty) {
-    return await this.prisma.problem.findMany({
-      where: { difficulty },
-      orderBy: { createdAt: 'desc' }
-    })
+    const sql = `
+      SELECT * FROM "Problem"
+      WHERE difficulty = $1
+      ORDER BY "createdAt" DESC
+    `
+    return await this.queryMany(sql, [difficulty])
   }
 
   async findProblemsByTag(tag) {
-    return await this.prisma.problem.findMany({
-      where: { tags: { hasSome: [tag] } },
-      orderBy: { createdAt: 'desc' }
-    })
+    const sql = `
+      SELECT * FROM "Problem"
+      WHERE $1 = ANY(tags)
+      ORDER BY "createdAt" DESC
+    `
+    return await this.queryMany(sql, [tag])
   }
 
   async getUniqueTags() {
-    const problems = await this.prisma.problem.findMany({
-      select: { tags: true }
-    })
-
-    const tagSet = new Set()
-    problems.forEach(p => {
-      if (p.tags) {
-        p.tags.forEach(tag => tagSet.add(tag))
-      }
-    })
-
-    return Array.from(tagSet).sort()
+    const sql = `
+      SELECT DISTINCT unnest(tags) as tag
+      FROM "Problem"
+      WHERE tags IS NOT NULL
+      ORDER BY tag ASC
+    `
+    const result = await this.queryMany(sql)
+    return result.map(r => r.tag)
   }
 
   async getProblemStats() {
+    const totalSql = 'SELECT COUNT(*) as count FROM "Problem"'
+    const total = await this.queryOne(totalSql)
+
+    const difficultySql = `
+      SELECT difficulty, COUNT(*) as count
+      FROM "Problem"
+      GROUP BY difficulty
+    `
+    const difficultyResults = await this.queryMany(difficultySql)
+
+    const byDifficulty = {
+      EASY: 0,
+      MEDIUM: 0,
+      HARD: 0
+    }
+
+    difficultyResults.forEach(result => {
+      byDifficulty[result.difficulty] = parseInt(result.count)
+    })
+
     return {
-      total: await this.prisma.problem.count(),
-      byDifficulty: {
-        EASY: await this.prisma.problem.count({ where: { difficulty: 'EASY' } }),
-        MEDIUM: await this.prisma.problem.count({ where: { difficulty: 'MEDIUM' } }),
-        HARD: await this.prisma.problem.count({ where: { difficulty: 'HARD' } })
-      }
+      total: parseInt(total.count),
+      byDifficulty
     }
   }
 }

@@ -1,99 +1,90 @@
 /**
  * Base Repository class
- * Provides common database operations and error handling
+ * Provides helper methods for raw SQL queries
  * Implements Data Mapper pattern for separation of concerns
  */
 class BaseRepository {
-  constructor(prisma, model) {
-    this.prisma = prisma
-    this.model = model
+  constructor(pool) {
+    this.pool = pool
   }
 
-  async findById(id, options = {}) {
+  /**
+   * Execute a query and return first result
+   */
+  async queryOne(sql, params = []) {
     try {
-      return await this.model.findUnique({
-        where: { id },
-        ...options
-      })
+      const result = await this.pool.query(sql, params)
+      return result.rows[0] || null
     } catch (error) {
-      throw new Error(`Failed to find ${this.model.name} by ID: ${error.message}`)
+      throw new Error(`Database query failed: ${error.message}`)
     }
   }
 
-  async findAll(options = {}) {
+  /**
+   * Execute a query and return all results
+   */
+  async queryMany(sql, params = []) {
     try {
-      return await this.model.findMany(options)
+      const result = await this.pool.query(sql, params)
+      return result.rows
     } catch (error) {
-      throw new Error(`Failed to fetch all records: ${error.message}`)
+      throw new Error(`Database query failed: ${error.message}`)
     }
   }
 
-  async findOne(where, options = {}) {
+  /**
+   * Execute a query and return affected row count
+   */
+  async queryCount(sql, params = []) {
     try {
-      return await this.model.findUnique({
-        where,
-        ...options
-      })
+      const result = await this.pool.query(sql, params)
+      return result.rowCount
     } catch (error) {
-      throw new Error(`Failed to find record: ${error.message}`)
+      throw new Error(`Database query failed: ${error.message}`)
     }
   }
 
-  async findMany(where, options = {}) {
+  /**
+   * Start a transaction
+   */
+  async startTransaction() {
+    const client = await this.pool.connect()
     try {
-      return await this.model.findMany({
-        where,
-        ...options
-      })
+      await client.query('BEGIN')
+      return client
     } catch (error) {
-      throw new Error(`Failed to find records: ${error.message}`)
+      client.release()
+      throw error
     }
   }
 
-  async create(data) {
+  /**
+   * Commit a transaction
+   */
+  async commitTransaction(client) {
     try {
-      return await this.model.create({ data })
-    } catch (error) {
-      throw new Error(`Failed to create record: ${error.message}`)
+      await client.query('COMMIT')
+    } finally {
+      client.release()
     }
   }
 
-  async update(id, data) {
+  /**
+   * Rollback a transaction
+   */
+  async rollbackTransaction(client) {
     try {
-      return await this.model.update({
-        where: { id },
-        data
-      })
-    } catch (error) {
-      throw new Error(`Failed to update record: ${error.message}`)
+      await client.query('ROLLBACK')
+    } finally {
+      client.release()
     }
   }
 
-  async delete(id) {
-    try {
-      return await this.model.delete({
-        where: { id }
-      })
-    } catch (error) {
-      throw new Error(`Failed to delete record: ${error.message}`)
-    }
-  }
-
-  async exists(where) {
-    try {
-      const record = await this.model.findFirst({ where })
-      return !!record
-    } catch (error) {
-      throw new Error(`Failed to check existence: ${error.message}`)
-    }
-  }
-
-  async count(where = {}) {
-    try {
-      return await this.model.count({ where })
-    } catch (error) {
-      throw new Error(`Failed to count records: ${error.message}`)
-    }
+  /**
+   * Format column name for SQL (escaping)
+   */
+  escapeIdentifier(name) {
+    return `"${name}"`
   }
 }
 

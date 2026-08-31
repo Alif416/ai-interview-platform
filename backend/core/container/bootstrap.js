@@ -1,6 +1,7 @@
 /**
  * Service Container Bootstrap
  * Registers all application services into the container
+ * Uses raw SQL repositories with pg Pool
  */
 const ServiceContainer = require('./ServiceContainer')
 const Logger = require('../logger/Logger')
@@ -10,13 +11,13 @@ const { connectRedis } = require('../../config/redis')
 
 // Import all services
 const UserRepository = require('../../repositories/UserRepository')
+const SessionRepository = require('../../repositories/SessionRepository')
+const ProblemRepository = require('../../repositories/ProblemRepository')
+const PerformanceRepository = require('../../repositories/PerformanceRepository')
 const AuthService = require('../../services/AuthService')
 const EmailService = require('../../services/EmailService')
 const CacheService = require('../../services/CacheService')
 const AIService = require('../../services/AIService')
-const SessionRepository = require('../../repositories/SessionRepository')
-const ProblemRepository = require('../../repositories/ProblemRepository')
-const PerformanceRepository = require('../../repositories/PerformanceRepository')
 
 async function bootstrapContainer() {
   const container = new ServiceContainer()
@@ -27,9 +28,9 @@ async function bootstrapContainer() {
   container.singleton('config', () => config)
 
   // Register database connections
-  container.singleton('prisma', async () => {
-    const { prisma } = require('../../config/database')
-    return prisma
+  container.singleton('pool', async () => {
+    const pool = await connectDB()
+    return pool
   })
 
   container.singleton('redis', async () => {
@@ -38,20 +39,21 @@ async function bootstrapContainer() {
   })
 
   // Register Repositories (singletons - they're stateless)
+  // All repositories use the pg Pool for raw SQL queries
   container.singleton('repositories.user', (c) => {
-    return new UserRepository(c.resolve('prisma'))
+    return new UserRepository(c.resolve('pool'))
   })
 
   container.singleton('repositories.session', (c) => {
-    return new SessionRepository(c.resolve('prisma'))
+    return new SessionRepository(c.resolve('pool'))
   })
 
   container.singleton('repositories.problem', (c) => {
-    return new ProblemRepository(c.resolve('prisma'))
+    return new ProblemRepository(c.resolve('pool'))
   })
 
   container.singleton('repositories.performance', (c) => {
-    return new PerformanceRepository(c.resolve('prisma'))
+    return new PerformanceRepository(c.resolve('pool'))
   })
 
   // Register Services (singletons)
