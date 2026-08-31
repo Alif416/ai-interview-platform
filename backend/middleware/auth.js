@@ -1,6 +1,11 @@
+/**
+ * Authentication Middleware
+ * Verifies JWT token and loads user
+ * Uses repository for data access
+ */
+
 const { verifyToken } = require('../utils/jwt')
-const { prisma } = require('../config/database')
-const ApiResponse = require('../utils/apiResponse')
+const { AuthError, ForbiddenError } = require('../core/errors')
 
 const authenticate = async (req, res, next) => {
   try {
@@ -15,17 +20,16 @@ const authenticate = async (req, res, next) => {
     }
 
     if (!token) {
-      return ApiResponse.unauthorized(res, 'No token provided')
+      throw new AuthError('No token provided', 'NO_TOKEN')
     }
 
     const decoded = verifyToken(token)
-
     if (!decoded) {
-      return ApiResponse.unauthorized(res, 'Invalid or expired token')
+      throw new AuthError('Invalid or expired token', 'INVALID_TOKEN')
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
+    const userRepository = req.container.userRepository
+    const user = await userRepository.findByIdWithoutThrow(decoded.userId, {
       select: {
         id: true,
         email: true,
@@ -36,27 +40,30 @@ const authenticate = async (req, res, next) => {
     })
 
     if (!user) {
-      return ApiResponse.unauthorized(res, 'User no longer exists')
+      throw new AuthError('User no longer exists', 'USER_NOT_FOUND')
     }
 
     req.user = user
     next()
   } catch (error) {
-    return ApiResponse.unauthorized(res, 'Authentication failed')
+    next(error) // Pass to error handler
   }
 }
 
-// Role-based access control
-// Usage: authorize('ADMIN', 'INTERVIEWER')
+/**
+ * Role-based access control middleware
+ * Usage: authorize('ADMIN', 'INTERVIEWER')
+ */
 const authorize = (...roles) => {
   return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
-      return ApiResponse.error(
-        res,
-        `Role ${req.user.role} is not authorized for this action`,
-        403
-      )
+    if (!req.user) {
+      return next(new AuthError('User not authenticated', 'NOT_AUTHENTICATED'))
     }
+
+    if (!roles.includes(req.user.role)) {
+      return next(new ForbiddenError(`Role ${req.user.role} is not authorized for this action`))
+    }
+
     next()
   }
 }

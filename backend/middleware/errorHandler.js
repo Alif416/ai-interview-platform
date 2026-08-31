@@ -1,35 +1,52 @@
-// Catches ALL unhandled errors in your entire app
-// Without this, your server crashes and shows ugly errors to users
+/**
+ * Global Error Handler Middleware
+ * Catches and formats all errors consistently
+ * Logs errors with context
+ */
 
 const ApiResponse = require('../utils/apiResponse')
+const { AppError, ValidationError, AuthError, NotFoundError } = require('../core/errors')
+const Logger = require('../core/logger/Logger')
+
+const logger = new Logger('ErrorHandler')
 
 const errorHandler = (err, req, res, next) => {
-  console.error('🔥 Unhandled Error:', {
-    message: err.message,
-    stack: err.stack,
+  // Log all errors with context
+  logger.error('Unhandled Error', err, {
     url: req.originalUrl,
     method: req.method,
-    timestamp: new Date().toISOString()
+    userAgent: req.get('user-agent'),
+    ip: req.ip,
   })
 
-  // Handle specific error types
-  if (err.name === 'ValidationError') {
-    return ApiResponse.badRequest(res, err.message)
+  // Handle custom app errors
+  if (err instanceof AppError) {
+    return ApiResponse.error(res, err.message, err.statusCode, err.errors || null)
   }
 
-  if (err.name === 'UnauthorizedError') {
-    return ApiResponse.unauthorized(res)
+  // Handle Zod validation errors
+  if (err.name === 'ZodError') {
+    const errors = err.issues.map(issue => ({
+      field: issue.path.join('.'),
+      message: issue.message,
+    }))
+    return ApiResponse.badRequest(res, 'Validation failed', errors)
   }
 
-  // Generic server error (don't expose internals to users!)
-  return ApiResponse.error(
-    res,
-    'Internal server error',
-    500
-  )
+  // Handle Prisma errors
+  if (err.code === 'P2002') {
+    return ApiResponse.badRequest(res, `Duplicate entry for field: ${err.meta?.target?.[0] || 'unknown'}`)
+  }
+
+  if (err.code === 'P2025') {
+    return ApiResponse.notFound(res, 'Resource not found')
+  }
+
+  // Default: generic server error (don't expose internals to users)
+  return ApiResponse.error(res, 'Internal server error', 500)
 }
 
-// Catches async errors that weren't caught
+// Catches 404s for routes not found
 const notFoundHandler = (req, res) => {
   ApiResponse.notFound(res, `Route ${req.originalUrl} does not exist`)
 }
