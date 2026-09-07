@@ -15,8 +15,15 @@ const connectRedis = async () => {
   redis.on('connect', () => console.log('✅ Redis connected successfully'))
   redis.on('error', (err) => console.error('❌ Redis error:', err.message))
 
-  await redis.connect()
-  return redis
+  try {
+    await redis.connect()
+    return redis
+  } catch (error) {
+    console.error('⚠️ Redis unavailable; using in-memory fallbacks:', error.message)
+    redis.disconnect()
+    redis = null
+    return null
+  }
 }
 
 const disconnectRedis = async () => {
