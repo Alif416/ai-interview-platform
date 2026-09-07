@@ -6,17 +6,24 @@ const config = require('./config')
 let redis = null
 
 const connectRedis = async () => {
-  redis = new Redis(config.REDIS_URL || 'redis://localhost:6379', {
-    maxRetriesPerRequest: 3,
-    enableReadyCheck: true,
-    lazyConnect: true,
-  })
+  try {
+    redis = new Redis(config.REDIS_URL || 'redis://localhost:6379', {
+      maxRetriesPerRequest: 3,
+      enableReadyCheck: true,
+      lazyConnect: true,
+    })
 
-  redis.on('connect', () => console.log('✅ Redis connected successfully'))
-  redis.on('error', (err) => console.error('❌ Redis error:', err.message))
+    redis.on('connect', () => console.log('✅ Redis connected successfully'))
+    redis.on('error', (err) => console.error('❌ Redis error:', err.message))
 
-  await redis.connect()
-  return redis
+    await redis.connect()
+    return redis
+  } catch (error) {
+    console.error('⚠️ Redis unavailable; using in-memory fallbacks:', error.message)
+    if (redis) redis.disconnect()
+    redis = null
+    return null
+  }
 }
 
 const disconnectRedis = async () => {
