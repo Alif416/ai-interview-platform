@@ -29,7 +29,13 @@ export default function Login() {
       await login(email, password)
       navigate('/dashboard')
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid email or password.')
+      if (err.response) {
+        setError(err.response.data?.message || 'Invalid email or password.')
+      } else if (err.code === 'ECONNABORTED') {
+        setError('The server is taking too long to respond. Please try again.')
+      } else {
+        setError('Unable to reach the server. Check your connection and try again.')
+      }
     } finally {
       setLoading(false)
     }

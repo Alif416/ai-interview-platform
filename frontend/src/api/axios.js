@@ -6,7 +6,11 @@ const api = axios.create({
     'Content-Type': 'application/json'
   },
   // Required so the browser sends the httpOnly cookie with every request
-  withCredentials: true
+  withCredentials: true,
+  // Without this, a dropped connection or a sleeping backend (e.g. Render
+  // free-tier cold start) leaves the request pending forever — the caller's
+  // promise never resolves or rejects, so a loading spinner never clears.
+  timeout: 20000
 })
 
 // REQUEST interceptor — attach token from localStorage as Bearer header
